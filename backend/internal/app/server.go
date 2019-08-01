@@ -1,24 +1,31 @@
 package app
 
 import (
-	"database/sql"
 	"encoding/json"
 	"fmt"
 	"github.com/gorilla/mux"
+	"github.com/r-cbb/cbbpoll/backend/internal/db"
 	"net/http"
 )
 
+/*
+Server is a type that holds state for the app, along with routers and handlers.
+*/
 type Server struct {
-	db     *sql.DB
+	db     *db.DBClient
 	router *mux.Router
 }
 
-func NewServer() *Server {
-	srv := Server{
-		db: nil,
+func NewServer() (*Server, error) {
+	srv := Server{}
+	var err error
+	srv.db, err = db.NewDBClient("cbbpoll")
+	if err != nil {
+		fmt.Printf("error: %v", err.Error())
+		return nil, err
 	}
 	srv.Routes()
-	return &srv
+	return &srv, nil
 }
 
 func (s *Server) Handler() http.Handler {
@@ -37,4 +44,8 @@ func (s *Server) respond(w http.ResponseWriter, r *http.Request, data interface{
 			fmt.Printf("json encode: %s", err)
 		} // TODO: logger
 	}
+}
+
+func (s *Server) decode(w http.ResponseWriter, r *http.Request, v interface{}) error {
+	return json.NewDecoder(r.Body).Decode(v)
 }
