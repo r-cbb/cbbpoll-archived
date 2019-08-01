@@ -12,7 +12,12 @@ import (
 func main() {
 	fmt.Println("hello")
 
-	server := app.NewServer()
+	server, err := app.NewServer()
+
+	if err != nil {
+		log.Fatal(err.Error())
+		panic(err.Error())
+	}
 
 	port := os.Getenv("PORT")
 	if port == "" {
