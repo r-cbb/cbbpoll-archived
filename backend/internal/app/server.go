@@ -8,6 +8,9 @@ import (
 	"net/http"
 )
 
+/*
+Server is a type that holds state for the app, along with routers and handlers.
+ */
 type Server struct {
 	db     *sql.DB
 	router *mux.Router
