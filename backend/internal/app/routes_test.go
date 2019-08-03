@@ -4,12 +4,14 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/r-cbb/cbbpoll/backend/internal/db/mocks"
-	"github.com/r-cbb/cbbpoll/backend/internal/errors"
-	"github.com/r-cbb/cbbpoll/backend/pkg"
+	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/r-cbb/cbbpoll/backend/internal/db/mocks"
+	"github.com/r-cbb/cbbpoll/backend/internal/errors"
+	"github.com/r-cbb/cbbpoll/backend/pkg"
 )
 
 var testTeam = pkg.Team{
@@ -43,12 +45,14 @@ func TestAddTeam(t *testing.T) {
 		name           string
 		input          interface{}
 		expectedStatus int
+		expectedBody   string
 		mockDb         mocks.DBClient
 	}{
 		{
 			name:           "Successful add",
 			input:          testTeam,
 			expectedStatus: http.StatusOK,
+			expectedBody:   "1\n",
 			mockDb:         addTeamMockDb(),
 		},
 		{
@@ -66,6 +70,7 @@ func TestAddTeam(t *testing.T) {
 			name:           "Concurrency Retry",
 			input:          testTeam,
 			expectedStatus: http.StatusOK,
+			expectedBody:   "1\n",
 			mockDb:         addTeamConcurrencyError(),
 		},
 	}
@@ -88,6 +93,13 @@ func TestAddTeam(t *testing.T) {
 			if w.Result().StatusCode != test.expectedStatus {
 				t.Errorf("AddTeam returned %v, expected %v", w.Result().StatusCode, test.expectedStatus)
 				return
+			}
+
+			bodyBytes, err := ioutil.ReadAll(w.Body)
+			bs := string(bodyBytes)
+
+			if bs != test.expectedBody {
+				t.Errorf("Response body differs from expected. Expected: %v, Actual: %v", test.expectedBody, bs)
 			}
 
 			test.mockDb.AssertExpectations(t)
