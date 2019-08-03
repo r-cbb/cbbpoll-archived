@@ -1,4 +1,4 @@
-package cbbpoll
+package pkg
 
 type Team struct {
 	ID         int64

@@ -3,10 +3,11 @@ package app
 import (
 	"fmt"
 	"github.com/gorilla/mux"
+	"github.com/r-cbb/cbbpoll/backend/internal/errors"
 	"net/http"
 	"strconv"
 
-	"github.com/r-cbb/cbbpoll/backend/internal/cbbpoll"
+	"github.com/r-cbb/cbbpoll/backend/pkg"
 )
 
 func (s *Server) Routes() {
@@ -24,7 +25,7 @@ func (s *Server) handleIndex() http.HandlerFunc {
 
 func (s *Server) handleAddTeam() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		var newTeam cbbpoll.Team
+		var newTeam pkg.Team
 		err := s.decode(w, r, &newTeam)
 		if err != nil {
 			fmt.Printf("bad input")
@@ -51,6 +52,11 @@ func (s *Server) handleGetTeam() http.HandlerFunc {
 		intId, err := strconv.Atoi(id)
 		team, err := s.db.GetTeam(int64(intId))
 		if err != nil {
+			if errors.Kind(err) == errors.KindNotFound {
+				s.respond(w, r, nil, http.StatusNotFound)
+				return
+			}
+
 			s.respond(w, r, nil, http.StatusInternalServerError)
 			return
 		}

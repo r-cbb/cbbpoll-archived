@@ -4,7 +4,8 @@ import (
 	"cloud.google.com/go/datastore"
 	"context"
 	"fmt"
-	"github.com/r-cbb/cbbpoll/backend/internal/cbbpoll"
+	"github.com/r-cbb/cbbpoll/backend/internal/errors"
+	"github.com/r-cbb/cbbpoll/backend/pkg"
 )
 
 // Eventually rename DBClient to DatastoreClient and abstract out an interface type DBClient
@@ -76,7 +77,7 @@ func (db *DBClient) nextID(kind string) (id int64, err error) {
 	return
 }
 
-func (db *DBClient) AddTeam(team cbbpoll.Team) (id int64, err error) {
+func (db *DBClient) AddTeam(team pkg.Team) (id int64, err error) {
 	ctx := context.Background()
 
 	newId, err := db.nextID("Team")
@@ -92,7 +93,7 @@ func (db *DBClient) AddTeam(team cbbpoll.Team) (id int64, err error) {
 		return 0, fmt.Errorf("datastoredb: could not create transaction: %v", err)
 	}
 
-	var tmp cbbpoll.Team
+	var tmp pkg.Team
 
 	// Perform a Get or Put to ensure atomicity
 	err = tx.Get(k, &tmp)
@@ -120,13 +121,17 @@ func (db *DBClient) AddTeam(team cbbpoll.Team) (id int64, err error) {
 	return newId, nil
 }
 
-func (db *DBClient) GetTeam(id int64) (team cbbpoll.Team, err error) {
+func (db *DBClient) GetTeam(id int64) (team pkg.Team, err error) {
+	const op errors.Op = "datastore.GetTeam"
 	ctx := context.Background()
 
 	k := datastore.IDKey("Team", id, nil)
 	err = db.client.Get(ctx, k, &team)
-	if err != nil {
-		return cbbpoll.Team{}, fmt.Errorf("error getting team: %v", err)
+
+	if err == datastore.ErrNoSuchEntity {
+		err = errors.E(errors.KindNotFound, op, err)
+	} else if err != nil {
+		err = errors.E(op, err)
 	}
 
 	return
