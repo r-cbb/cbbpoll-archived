@@ -1,18 +1,46 @@
 package db
 
 import (
-	"cloud.google.com/go/datastore"
 	"context"
 	"fmt"
-	"github.com/r-cbb/cbbpoll/backend/internal/cbbpoll"
+
+	"cloud.google.com/go/datastore"
+
+	"github.com/r-cbb/cbbpoll/backend/internal/errors"
+	"github.com/r-cbb/cbbpoll/backend/pkg"
 )
 
-// Eventually rename DBClient to DatastoreClient and abstract out an interface type DBClient
-type DBClient struct {
+// Eventually rename DatastoreClient to DatastoreClient and abstract out an interface type DatastoreClient
+type DatastoreClient struct {
 	client *datastore.Client
 }
 
-func NewDBClient(projectId string) (*DBClient, error) {
+type idStruct struct {
+	ID int64
+}
+
+func (i *idStruct) Load(property []datastore.Property) error {
+	var ok, foundId bool
+	for _, v := range property {
+		if v.Name == "ID" {
+			i.ID, ok = v.Value.(int64)
+			if !ok {
+				return fmt.Errorf("error loading ID property")
+			}
+			foundId = true
+		}
+	}
+	if !foundId {
+		return fmt.Errorf("no ID property on load")
+	}
+	return nil
+}
+
+func (i idStruct) Save() ([]datastore.Property, error) {
+	return nil, fmt.Errorf("Should never save an idStruct to storage")
+}
+
+func NewDatastoreClient(projectId string) (*DatastoreClient, error) {
 	ctx := context.Background()
 
 	client, err := datastore.NewClient(ctx, projectId)
@@ -29,47 +57,84 @@ func NewDBClient(projectId string) (*DBClient, error) {
 		return nil, fmt.Errorf("datastoredb: could not connect: %v", err)
 	}
 
-	return &DBClient{client: client}, nil
+	return &DatastoreClient{client: client}, nil
 }
 
-func (db *DBClient) AddTeam(team cbbpoll.Team) (id int64, err error) {
+func (db *DatastoreClient) nextID(kind string) (id int64, err error) {
 	ctx := context.Background()
-	k := datastore.IncompleteKey("Team", nil)
+	q := datastore.NewQuery(kind).Order("-ID")
+	var ids []idStruct
 
-	q := datastore.NewQuery("Team").Order("-ID").Limit(1)
-
-	var teams []cbbpoll.Team
-
-	keys, err := db.client.GetAll(ctx, q, &teams)
-
-	var newId int64
-	newId = 0
-	if len(keys) > 0 {
-		fmt.Printf("greatest ID found: %v", teams[0].ID)
-		newId = teams[0].ID + 1
-	}
-
-	team.ID = newId
-
-	k, err = db.client.Put(ctx, k, &team)
+	_, err = db.client.GetAll(ctx, q, &ids)
 	if err != nil {
-		return 0, fmt.Errorf("datastoredb: could not put Team: %v", err)
+		return
 	}
+
+	if len(ids) == 0 {
+		id = 1
+	} else {
+		id = ids[0].ID + 1
+	}
+
+	return
+}
+
+func (db *DatastoreClient) AddTeam(team pkg.Team) (id int64, err error) {
+	ctx := context.Background()
+
+	newId, err := db.nextID("Team")
+	if err != nil {
+		fmt.Printf("error finding next ID: %v", err.Error())
+		return 0, err
+	}
+	team.ID = newId
+	k := datastore.IDKey("Team", newId, nil)
+
+	tx, err := db.client.NewTransaction(ctx)
+	if err != nil {
+		return 0, fmt.Errorf("datastoredb: could not create transaction: %v", err)
+	}
+
+	var tmp pkg.Team
+
+	// Perform a Get or Put to ensure atomicity
+	err = tx.Get(k, &tmp)
+	if err == nil || err != datastore.ErrNoSuchEntity{
+		_ = tx.Rollback()
+		return 0, fmt.Errorf("concurrency error adding Team")
+	}
+
+	pk, err := tx.Put(k, &team)
+	if err != nil {
+		_ = tx.Rollback()
+		return 0, fmt.Errorf("datastoredb: could not put team entity: %v", err)
+	}
+
+	c, err := tx.Commit()
+	if err != nil {
+		return 0, fmt.Errorf("datastoredb: error committing transaction: %v", err)
+	}
+
+	k = c.Key(pk)
+	if k.ID != newId {
+		panic("keys don't match")
+	}
+
 	return newId, nil
 }
 
-func (db *DBClient) GetTeam(id int64) (team cbbpoll.Team, err error) {
+func (db *DatastoreClient) GetTeam(id int64) (team pkg.Team, err error) {
+	const op errors.Op = "datastore.GetTeam"
 	ctx := context.Background()
 
-	q := datastore.NewQuery("Team").Filter("ID =", id)
+	k := datastore.IDKey("Team", id, nil)
+	err = db.client.Get(ctx, k, &team)
 
-	var teams []cbbpoll.Team
-
-	keys, err := db.client.GetAll(ctx, q, &teams)
-
-	if len(keys) != 1 {
-		return cbbpoll.Team{}, fmt.Errorf("not found")
+	if err == datastore.ErrNoSuchEntity {
+		err = errors.E(errors.KindNotFound, op, err)
+	} else if err != nil {
+		err = errors.E(op, err)
 	}
 
-	return teams[0], nil
+	return
 }

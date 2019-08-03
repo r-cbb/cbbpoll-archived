@@ -2,17 +2,21 @@ package main
 
 import (
 	"fmt"
-	"github.com/r-cbb/cbbpoll/backend/internal/app"
 	"log"
 	"net/http"
 	"os"
 	"time"
+
+	"github.com/r-cbb/cbbpoll/backend/internal/app"
+	"github.com/r-cbb/cbbpoll/backend/internal/db"
 )
 
 func main() {
 	fmt.Println("hello")
 
-	server, err := app.NewServer()
+	server := app.NewServer()
+	var err error
+	server.Db, err = db.NewDatastoreClient("cbbpoll")
 
 	if err != nil {
 		log.Fatal(err.Error())
