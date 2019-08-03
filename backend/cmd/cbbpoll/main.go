@@ -2,12 +2,13 @@ package main
 
 import (
 	"fmt"
-	"github.com/r-cbb/cbbpoll/backend/internal/app"
-	"github.com/r-cbb/cbbpoll/backend/internal/db"
 	"log"
 	"net/http"
 	"os"
 	"time"
+
+	"github.com/r-cbb/cbbpoll/backend/internal/app"
+	"github.com/r-cbb/cbbpoll/backend/internal/db"
 )
 
 func main() {

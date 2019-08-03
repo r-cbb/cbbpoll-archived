@@ -3,9 +3,11 @@ package app
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/gorilla/mux"
-	"github.com/r-cbb/cbbpoll/backend/internal/db"
 	"net/http"
+
+	"github.com/gorilla/mux"
+
+	"github.com/r-cbb/cbbpoll/backend/internal/db"
 )
 
 /*

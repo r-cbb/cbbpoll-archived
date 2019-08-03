@@ -35,7 +35,7 @@ func addTeamDbError() mocks.DBClient {
 
 func addTeamConcurrencyError() mocks.DBClient {
 	myMock := mocks.DBClient{}
-	myMock.On("AddTeam", testTeam).Return(int64(0), errors.E(errors.KindConcurrencyProblem, fmt.Errorf("some error"))).Times(1)
+	myMock.On("AddTeam", testTeam).Return(int64(0), errors.E(errors.KindConcurrencyProblem, fmt.Errorf("some error"))).Once()
 	myMock.On("AddTeam", testTeam).Return(int64(1), nil).Once()
 	return myMock
 }

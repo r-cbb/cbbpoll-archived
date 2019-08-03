@@ -1,9 +1,11 @@
 package db
 
 import (
-	"cloud.google.com/go/datastore"
 	"context"
 	"fmt"
+
+	"cloud.google.com/go/datastore"
+
 	"github.com/r-cbb/cbbpoll/backend/internal/errors"
 	"github.com/r-cbb/cbbpoll/backend/pkg"
 )
