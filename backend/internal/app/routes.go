@@ -1,12 +1,12 @@
 package app
 
 import (
-	"fmt"
-	"github.com/gorilla/mux"
-	"github.com/r-cbb/cbbpoll/backend/internal/errors"
 	"net/http"
 	"strconv"
 
+	"github.com/gorilla/mux"
+
+	"github.com/r-cbb/cbbpoll/backend/internal/errors"
 	"github.com/r-cbb/cbbpoll/backend/pkg"
 )
 
@@ -19,7 +19,7 @@ func (s *Server) Routes() {
 
 func (s *Server) handleIndex() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		s.respond(w, r, struct{ Foo string}{Foo: "hello world"}, 200)
+		s.respond(w, r, struct{ Foo string }{Foo: "hello world"}, 200)
 	}
 }
 
@@ -28,14 +28,18 @@ func (s *Server) handleAddTeam() http.HandlerFunc {
 		var newTeam pkg.Team
 		err := s.decode(w, r, &newTeam)
 		if err != nil {
-			fmt.Printf("bad input")
 			s.respond(w, r, nil, http.StatusBadRequest)
 			return
 		}
 
-		id, err := s.db.AddTeam(newTeam)
+		id, err := s.Db.AddTeam(newTeam)
+
+		if errors.Kind(err) == errors.KindConcurrencyProblem {
+			// Retry once
+			id, err = s.Db.AddTeam(newTeam)
+		}
+
 		if err != nil {
-			fmt.Printf("db error: %v", err.Error())
 			s.respond(w, r, nil, http.StatusInternalServerError)
 			return
 		}
@@ -50,7 +54,12 @@ func (s *Server) handleGetTeam() http.HandlerFunc {
 		vars := mux.Vars(r)
 		id := vars["id"]
 		intId, err := strconv.Atoi(id)
-		team, err := s.db.GetTeam(int64(intId))
+		if err != nil {
+			s.respond(w, r, nil, http.StatusBadRequest)
+			return
+		}
+
+		team, err := s.Db.GetTeam(int64(intId))
 		if err != nil {
 			if errors.Kind(err) == errors.KindNotFound {
 				s.respond(w, r, nil, http.StatusNotFound)
@@ -60,6 +69,7 @@ func (s *Server) handleGetTeam() http.HandlerFunc {
 			s.respond(w, r, nil, http.StatusInternalServerError)
 			return
 		}
+
 		s.respond(w, r, team, http.StatusOK)
 		return
 	}

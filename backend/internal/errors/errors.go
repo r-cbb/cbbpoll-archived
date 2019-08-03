@@ -13,6 +13,7 @@ type Code uint
 const (
 	KindUnexpected Code = iota // zero type is purposefully KindUnexpected
 	KindNotFound
+	KindConcurrencyProblem
 )
 
 

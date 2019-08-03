@@ -8,16 +8,16 @@ import (
 	"github.com/r-cbb/cbbpoll/backend/pkg"
 )
 
-// Eventually rename DBClient to DatastoreClient and abstract out an interface type DBClient
-type DBClient struct {
+// Eventually rename DatastoreClient to DatastoreClient and abstract out an interface type DatastoreClient
+type DatastoreClient struct {
 	client *datastore.Client
 }
 
-type IDStruct struct {
+type idStruct struct {
 	ID int64
 }
 
-func (i *IDStruct) Load(property []datastore.Property) error {
+func (i *idStruct) Load(property []datastore.Property) error {
 	var ok, foundId bool
 	for _, v := range property {
 		if v.Name == "ID" {
@@ -34,11 +34,11 @@ func (i *IDStruct) Load(property []datastore.Property) error {
 	return nil
 }
 
-func (i IDStruct) Save() ([]datastore.Property, error) {
-	return nil, fmt.Errorf("Should never save an IDStruct to storage")
+func (i idStruct) Save() ([]datastore.Property, error) {
+	return nil, fmt.Errorf("Should never save an idStruct to storage")
 }
 
-func NewDBClient(projectId string) (*DBClient, error) {
+func NewDatastoreClient(projectId string) (*DatastoreClient, error) {
 	ctx := context.Background()
 
 	client, err := datastore.NewClient(ctx, projectId)
@@ -55,13 +55,13 @@ func NewDBClient(projectId string) (*DBClient, error) {
 		return nil, fmt.Errorf("datastoredb: could not connect: %v", err)
 	}
 
-	return &DBClient{client: client}, nil
+	return &DatastoreClient{client: client}, nil
 }
 
-func (db *DBClient) nextID(kind string) (id int64, err error) {
+func (db *DatastoreClient) nextID(kind string) (id int64, err error) {
 	ctx := context.Background()
 	q := datastore.NewQuery(kind).Order("-ID")
-	var ids []IDStruct
+	var ids []idStruct
 
 	_, err = db.client.GetAll(ctx, q, &ids)
 	if err != nil {
@@ -77,7 +77,7 @@ func (db *DBClient) nextID(kind string) (id int64, err error) {
 	return
 }
 
-func (db *DBClient) AddTeam(team pkg.Team) (id int64, err error) {
+func (db *DatastoreClient) AddTeam(team pkg.Team) (id int64, err error) {
 	ctx := context.Background()
 
 	newId, err := db.nextID("Team")
@@ -121,7 +121,7 @@ func (db *DBClient) AddTeam(team pkg.Team) (id int64, err error) {
 	return newId, nil
 }
 
-func (db *DBClient) GetTeam(id int64) (team pkg.Team, err error) {
+func (db *DatastoreClient) GetTeam(id int64) (team pkg.Team, err error) {
 	const op errors.Op = "datastore.GetTeam"
 	ctx := context.Background()
 

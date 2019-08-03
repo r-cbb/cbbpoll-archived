@@ -12,20 +12,14 @@ import (
 Server is a type that holds state for the app, along with routers and handlers.
 */
 type Server struct {
-	db     *db.DBClient
+	Db     db.DBClient
 	router *mux.Router
 }
 
-func NewServer() (*Server, error) {
+func NewServer() *Server {
 	srv := Server{}
-	var err error
-	srv.db, err = db.NewDBClient("cbbpoll")
-	if err != nil {
-		fmt.Printf("error: %v", err.Error())
-		return nil, err
-	}
 	srv.Routes()
-	return &srv, nil
+	return &srv
 }
 
 func (s *Server) Handler() http.Handler {
