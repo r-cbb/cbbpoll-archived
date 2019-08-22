@@ -14,7 +14,7 @@ npm i
 ```
 Start dev server
 ```
-npm start
+npm run serve
 ```
 Build for production
 ```
