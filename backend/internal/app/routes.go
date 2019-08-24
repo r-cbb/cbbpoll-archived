@@ -6,20 +6,21 @@ import (
 
 	"github.com/gorilla/mux"
 
-	"github.com/r-cbb/cbbpoll/backend/internal/errors"
-	"github.com/r-cbb/cbbpoll/backend/pkg"
+	"github.com/r-cbb/cbbpoll/internal/errors"
+	"github.com/r-cbb/cbbpoll/pkg"
 )
 
 func (s *Server) Routes() {
 	s.router = mux.NewRouter()
-	s.router.HandleFunc("/", s.handleIndex())
+	s.router.HandleFunc("/", s.handlePing())
+	s.router.HandleFunc("/ping", s.handlePing())
 	s.router.HandleFunc("/team", s.handleAddTeam()).Methods(http.MethodPost)
 	s.router.HandleFunc("/team/{id:[0-9]+}", s.handleGetTeam()).Methods(http.MethodGet)
 }
 
-func (s *Server) handleIndex() http.HandlerFunc {
+func (s *Server) handlePing() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		s.respond(w, r, struct{ Foo string }{Foo: "hello world"}, 200)
+		s.respond(w, r, struct{ Version string }{Version: "0.1"}, 200)
 	}
 }
 
