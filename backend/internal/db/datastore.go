@@ -6,8 +6,8 @@ import (
 
 	"cloud.google.com/go/datastore"
 
-	"github.com/r-cbb/cbbpoll/backend/internal/errors"
-	"github.com/r-cbb/cbbpoll/backend/pkg"
+	"github.com/r-cbb/cbbpoll/internal/errors"
+	"github.com/r-cbb/cbbpoll/pkg"
 )
 
 // Eventually rename DatastoreClient to DatastoreClient and abstract out an interface type DatastoreClient
