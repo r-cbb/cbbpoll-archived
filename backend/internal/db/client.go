@@ -1,6 +1,6 @@
 package db
 
-import "github.com/r-cbb/cbbpoll/backend/pkg"
+import "github.com/r-cbb/cbbpoll/pkg"
 
 type DBClient interface {
 	AddTeam(team pkg.Team) (id int64, err error)

@@ -9,9 +9,9 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/r-cbb/cbbpoll/backend/internal/db/mocks"
-	"github.com/r-cbb/cbbpoll/backend/internal/errors"
-	"github.com/r-cbb/cbbpoll/backend/pkg"
+	"github.com/r-cbb/cbbpoll/internal/db/mocks"
+	"github.com/r-cbb/cbbpoll/internal/errors"
+	"github.com/r-cbb/cbbpoll/pkg"
 )
 
 var testTeam = pkg.Team{

@@ -7,17 +7,19 @@ import (
 	"os"
 	"time"
 
-	"github.com/r-cbb/cbbpoll/backend/internal/app"
-	"github.com/r-cbb/cbbpoll/backend/internal/db"
+	"github.com/r-cbb/cbbpoll/internal/app"
+	"github.com/r-cbb/cbbpoll/internal/db"
 )
 
 func main() {
-	fmt.Println("hello")
+	log.SetOutput(os.Stdout)
+	log.Println("Initializing server...")
 
 	server := app.NewServer()
 	var err error
 	server.Db, err = db.NewDatastoreClient("cbbpoll")
 
+	log.Println("\tDatastoreClient initialized")
 	if err != nil {
 		log.Fatal(err.Error())
 		panic(err.Error())
@@ -26,7 +28,9 @@ func main() {
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8000"
-		log.Printf("Defaulting to port %s", port)
+		log.Printf("\tDefaulting to port %s", port)
+	} else {
+		log.Printf("\tUsing port %s from environment variable", port)
 	}
 
 	srv := &http.Server{
@@ -36,5 +40,7 @@ func main() {
 		ReadTimeout:  15 * time.Second,
 	}
 
-	log.Fatal(srv.ListenAndServe())
+	log.Println("Serving...")
+
+	log.Println(srv.ListenAndServe())
 }

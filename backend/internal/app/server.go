@@ -7,7 +7,7 @@ import (
 
 	"github.com/gorilla/mux"
 
-	"github.com/r-cbb/cbbpoll/backend/internal/db"
+	"github.com/r-cbb/cbbpoll/internal/db"
 )
 
 /*
@@ -33,7 +33,9 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) respond(w http.ResponseWriter, r *http.Request, data interface{}, status int) {
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
+
 	if data != nil {
 		err := json.NewEncoder(w).Encode(data)
 		if err != nil {
