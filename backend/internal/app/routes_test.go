@@ -11,10 +11,18 @@ import (
 
 	"github.com/r-cbb/cbbpoll/internal/db/mocks"
 	"github.com/r-cbb/cbbpoll/internal/errors"
-	"github.com/r-cbb/cbbpoll/pkg"
+	"github.com/r-cbb/cbbpoll/internal/models"
 )
 
-var testTeam = pkg.Team{
+var testTeam = models.Team {
+	FullName:   "University of Arizona",
+	ShortName:  "Arizona",
+	Nickname:   "Wildcats",
+	Conference: "Pac-12",
+}
+
+var returnedTeam = models.Team{
+	ID: 1,
 	FullName:   "University of Arizona",
 	ShortName:  "Arizona",
 	Nickname:   "Wildcats",
@@ -23,24 +31,30 @@ var testTeam = pkg.Team{
 
 func addTeamMockDb() mocks.DBClient {
 	myMock := mocks.DBClient{}
-	myMock.On("AddTeam", testTeam).Return(int64(1), nil).Once()
+	myMock.On("AddTeam", testTeam).Return(returnedTeam, nil).Once()
 	return myMock
 }
 
 func addTeamDbError() mocks.DBClient {
 	myMock := mocks.DBClient{}
-	myMock.On("AddTeam", testTeam).Return(int64(0), fmt.Errorf("some error")).Once()
+	myMock.On("AddTeam", testTeam).Return(models.Team{}, fmt.Errorf("some error")).Once()
 	return myMock
 }
 
 func addTeamConcurrencyError() mocks.DBClient {
 	myMock := mocks.DBClient{}
-	myMock.On("AddTeam", testTeam).Return(int64(0), errors.E(errors.KindConcurrencyProblem, fmt.Errorf("some error"))).Once()
-	myMock.On("AddTeam", testTeam).Return(int64(1), nil).Once()
+	myMock.On("AddTeam", testTeam).Return(models.Team{}, errors.E(errors.KindConcurrencyProblem, fmt.Errorf("some error"))).Once()
+	myMock.On("AddTeam", testTeam).Return(returnedTeam, nil).Once()
 	return myMock
 }
 
 func TestAddTeam(t *testing.T) {
+	testTeamJson, err := json.Marshal(returnedTeam)
+	if err != nil {
+		panic("Couldn't marshal testTeam")
+	}
+	testTeamStr := string(testTeamJson) + "\n"
+
 	tests := []struct {
 		name           string
 		input          interface{}
@@ -52,7 +66,7 @@ func TestAddTeam(t *testing.T) {
 			name:           "Successful add",
 			input:          testTeam,
 			expectedStatus: http.StatusOK,
-			expectedBody:   "1\n",
+			expectedBody:   testTeamStr,
 			mockDb:         addTeamMockDb(),
 		},
 		{
@@ -70,7 +84,7 @@ func TestAddTeam(t *testing.T) {
 			name:           "Concurrency Retry",
 			input:          testTeam,
 			expectedStatus: http.StatusOK,
-			expectedBody:   "1\n",
+			expectedBody:   testTeamStr,
 			mockDb:         addTeamConcurrencyError(),
 		},
 	}
@@ -87,7 +101,7 @@ func TestAddTeam(t *testing.T) {
 				return
 			}
 
-			r := httptest.NewRequest(http.MethodPost, "/team", &buf)
+			r := httptest.NewRequest(http.MethodPost, "/teams", &buf)
 			w := httptest.NewRecorder()
 			srv.ServeHTTP(w, r)
 			if w.Result().StatusCode != test.expectedStatus {
