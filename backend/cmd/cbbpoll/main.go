@@ -33,6 +33,15 @@ func main() {
 		log.Printf("\tUsing port %s from environment variable", port)
 	}
 
+	server.TokenAuth, err = app.InitJwtAuth("jwtRS256.key", "jwtRS256.key.pub")
+	if err != nil {
+		log.Printf("error initializing JWT authentication: %s", err.Error())
+	} else {
+		server.AuthRoutes()
+	}
+
+	// TODO: flag to enable TLS
+
 	srv := &http.Server{
 		Handler: server.Handler(),
 		Addr:    fmt.Sprintf(":%s", port),
