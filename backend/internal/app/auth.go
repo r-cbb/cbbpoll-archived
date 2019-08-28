@@ -6,6 +6,7 @@ import (
 
 	"github.com/dgrijalva/jwt-go"
 	"github.com/go-chi/jwtauth"
+	"github.com/gorilla/mux"
 
 	"github.com/r-cbb/cbbpoll/internal/errors"
 	"github.com/r-cbb/cbbpoll/internal/models"
@@ -50,7 +51,29 @@ func InitJwtAuth(secretPath, publicPath string) (*jwtauth.JWTAuth, error) {
 	return jwtauth.New("RS256", privateKey, pubKey), nil
 }
 
-func Authenticator(next http.Handler) http.Handler {
+func Authenticator(excludes []*mux.Route) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			curr := mux.CurrentRoute(r)
+			exclude := false
+			for _, e := range excludes {
+				if e == curr {
+					exclude = true
+				}
+			}
+
+			if exclude {
+				next.ServeHTTP(w, r)
+				return
+			} else {
+				authenticatorHelper(next).ServeHTTP(w, r)
+				return
+			}
+		})
+	}
+}
+
+func authenticatorHelper(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		token, _, err := jwtauth.FromContext(r.Context())
 

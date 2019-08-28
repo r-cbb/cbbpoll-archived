@@ -3,6 +3,7 @@ package app
 import (
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/go-chi/jwtauth"
 	"github.com/gorilla/mux"
@@ -29,10 +30,10 @@ func (s *Server) Routes() {
 }
 
 func (s *Server) AuthRoutes() {
-	s.router.Use(jwtauth.Verifier(s.TokenAuth))
-	s.router.Use(Authenticator)
+	newSession := s.router.HandleFunc("/sessions", s.handleNewSession()).Methods(http.MethodPost)
 
-	s.router.HandleFunc("/sessions", s.handleNewSession()).Methods(http.MethodPost)
+	s.router.Use(jwtauth.Verifier(s.TokenAuth))
+	s.router.Use(Authenticator([]*mux.Route{newSession}))
 }
 
 func (s *Server) handlePing() http.HandlerFunc {
@@ -148,17 +149,17 @@ func (s *Server) handleGetUser() http.HandlerFunc {
 
 func (s *Server) handleNewSession() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		var authToken struct {
-			AccessToken string
-		}
+		authHeader := r.Header.Get("Authorization")
 
-		err := s.decode(w, r, &authToken)
-		if err != nil {
+		splitHeader := strings.Split(authHeader, "Bearer")
+		if len(splitHeader) != 2 { // Bearer token not in proper format
 			s.respond(w, r, nil, http.StatusBadRequest)
 			return
 		}
 
-		name, err := usernameFromRedditToken(authToken.AccessToken)
+		accessToken := strings.TrimSpace(splitHeader[1])
+
+		name, err := usernameFromRedditToken(accessToken)
 		if err != nil {
 			if errors.Kind(err) == errors.KindAuthError {
 				s.respond(w, r, nil, http.StatusUnauthorized) // received a 401 from reddit
