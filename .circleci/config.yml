@@ -16,8 +16,13 @@ jobs:
     working_directory: ~/cbbpoll
     steps:
       - checkout
-        path: ~/cbbpoll/backend
 
       # specify any bash command here prefixed with `run: `
-      - run: go get -v -d ./...
-      - run: go test -v ./...
+      - run:
+          name: get dependencies
+          command: go get -v -d ./...
+          working_directory: ~/cbbpoll/backend
+      - run:
+          name: run tests
+          command: go test -v ./...
+          working_directory: ~/cbbpoll/backend
