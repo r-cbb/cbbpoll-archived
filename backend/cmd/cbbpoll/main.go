@@ -43,7 +43,7 @@ func main() {
 	// TODO: flag to enable TLS
 
 	srv := &http.Server{
-		Handler: server.Handler(),
+		Handler: server,
 		Addr:    fmt.Sprintf(":%s", port),
 		WriteTimeout: 15 * time.Second,
 		ReadTimeout:  15 * time.Second,

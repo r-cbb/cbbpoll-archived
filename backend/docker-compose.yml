@@ -22,5 +22,10 @@ services:
     ports:
       - "8000:8000"
 
+  test:
+    build:
+      context: .
+      dockerfile: test.Dockerfile
+
 volumes:
   dbdata:

@@ -12,6 +12,8 @@ import (
 	"github.com/r-cbb/cbbpoll/internal/models"
 )
 
+// TODO split routes/handlers
+
 func (s *Server) Routes() {
 	s.router = mux.NewRouter()
 

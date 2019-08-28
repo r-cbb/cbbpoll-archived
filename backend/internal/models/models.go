@@ -6,6 +6,8 @@ import (
 	"github.com/r-cbb/cbbpoll/internal/errors"
 )
 
+// todo struct tags for json encoding/decoding
+
 type Team struct {
 	ID         int64
 	FullName   string

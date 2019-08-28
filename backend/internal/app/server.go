@@ -3,12 +3,14 @@ package app
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 
 	"github.com/go-chi/jwtauth"
 	"github.com/gorilla/mux"
 
 	"github.com/r-cbb/cbbpoll/internal/db"
+	"github.com/r-cbb/cbbpoll/internal/errors"
 )
 
 /*
@@ -43,12 +45,15 @@ func (s *Server) respond(w http.ResponseWriter, r *http.Request, data interface{
 		err := json.NewEncoder(w).Encode(data)
 		if err != nil {
 			fmt.Printf("json encode: %s", err)
-		} // TODO: logger
+		}
 	}
 }
 
+const maxRequestSize = 1 << 20 // 1 MB
+
 func (s *Server) decode(w http.ResponseWriter, r *http.Request, v interface{}) error {
-	return json.NewDecoder(r.Body).Decode(v)
+	const op errors.Op = "server.decode"
+	return json.NewDecoder(io.LimitReader(r.Body, maxRequestSize)).Decode(&v)
 }
 
 func (s Server) version() string {
