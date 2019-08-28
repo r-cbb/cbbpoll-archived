@@ -1,5 +1,8 @@
 # cbbpoll Backend
 
+[![CircleCI](https://circleci.com/gh/r-cbb/cbbpoll.svg?style=svg)](https://circleci.com/gh/r-cbb/cbbpoll)
+[![codecov](https://codecov.io/gh/r-cbb/cbbpoll/branch/master/graph/badge.svg)](https://codecov.io/gh/r-cbb/cbbpoll)
+
 ## Setting up a Local Development Environment
 
 The easiest way to deploy the cbbpoll backend locally is using
