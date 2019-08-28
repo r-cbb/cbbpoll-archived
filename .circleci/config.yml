@@ -22,7 +22,14 @@ jobs:
           name: get dependencies
           command: go get -v -d ./...
           working_directory: ~/cbbpoll/backend
+
       - run:
           name: run tests
-          command: go test -v ./...
+          command: |
+            go test -v -coverprofile=c.out ./...
+            go tool cover -html=c.out -o coverage.html
+            mv coverage.html /tmp/artifacts
           working_directory: ~/cbbpoll/backend
+
+      - store_artifacts:
+          path: /tmp/artifacts
