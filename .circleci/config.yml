@@ -26,10 +26,15 @@ jobs:
       - run:
           name: run tests
           command: |
-            go test -v -coverprofile=c.out ./...
+            go test -v -coverprofile=coverage.txt ./...
             go tool cover -html=c.out -o coverage.html
             mv coverage.html /tmp/artifacts
           working_directory: ~/cbbpoll/backend
 
       - store_artifacts:
           path: /tmp/artifacts
+
+      - run:
+          name: upload to codecov
+          command: bash <(curl -s https://codecov.io/bash)
+          working_directory: ~/cbbpoll/backend
