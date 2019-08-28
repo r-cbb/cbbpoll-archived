@@ -13,11 +13,11 @@ jobs:
       # documented at https://circleci.com/docs/2.0/circleci-images/
       # - image: circleci/postgres:9.4
 
-    working_directory: /go/src/github.com/r-cbb/cbbpoll
+    working_directory: ~/cbbpoll
     steps:
       - checkout
+        path: ~/cbbpoll/backend
 
       # specify any bash command here prefixed with `run: `
-      - run: cd backend
       - run: go get -v -d ./...
       - run: go test -v ./...
