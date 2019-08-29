@@ -6,9 +6,8 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/go-chi/jwtauth"
 	"github.com/gorilla/mux"
-
+	"github.com/r-cbb/cbbpoll/internal/auth"
 	"github.com/r-cbb/cbbpoll/internal/db"
 	"github.com/r-cbb/cbbpoll/internal/errors"
 )
@@ -17,9 +16,9 @@ import (
 Server is a type that holds state for the app, along with routers and handlers.
 */
 type Server struct {
-	Db        db.DBClient
-	TokenAuth *jwtauth.JWTAuth
-	router    *mux.Router
+	Db         db.DBClient
+	AuthClient auth.AuthClient
+	router     *mux.Router
 }
 
 func NewServer() *Server {

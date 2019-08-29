@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/r-cbb/cbbpoll/internal/app"
+	"github.com/r-cbb/cbbpoll/internal/auth"
 	"github.com/r-cbb/cbbpoll/internal/db"
 )
 
@@ -33,7 +34,7 @@ func main() {
 		log.Printf("\tUsing port %s from environment variable", port)
 	}
 
-	server.TokenAuth, err = app.InitJwtAuth("jwtRS256.key", "jwtRS256.key.pub")
+	server.AuthClient, err = auth.InitJwtAuth("jwtRS256.key", "jwtRS256.key.pub")
 	if err != nil {
 		log.Printf("error initializing JWT authentication: %s", err.Error())
 	} else {

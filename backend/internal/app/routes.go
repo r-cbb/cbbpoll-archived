@@ -5,7 +5,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/go-chi/jwtauth"
 	"github.com/gorilla/mux"
 
 	"github.com/r-cbb/cbbpoll/internal/errors"
@@ -34,8 +33,8 @@ func (s *Server) Routes() {
 func (s *Server) AuthRoutes() {
 	newSession := s.router.HandleFunc("/sessions", s.handleNewSession()).Methods(http.MethodPost)
 
-	s.router.Use(jwtauth.Verifier(s.TokenAuth))
-	s.router.Use(Authenticator([]*mux.Route{newSession}))
+	s.router.Use(s.AuthClient.Verifier())
+	s.router.Use(s.AuthClient.Authenticator([]*mux.Route{newSession}))
 }
 
 func (s *Server) handlePing() http.HandlerFunc {
@@ -110,7 +109,7 @@ func (s *Server) handleListTeams() http.HandlerFunc {
 
 func (s *Server) handleUsersMe() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		token := models.UserTokenFromContext(r.Context())
+		token := s.AuthClient.UserTokenFromCtx(r.Context())
 
 		if !token.LoggedIn() {
 			s.respond(w, r, nil, http.StatusUnauthorized)
@@ -191,7 +190,7 @@ func (s *Server) handleNewSession() http.HandlerFunc {
 			newUser = true
 		}
 
-		out, err := createJWT(user, s.TokenAuth)
+		out, err := s.AuthClient.CreateJWT(user)
 		if err != nil {
 			s.respond(w, r, nil, http.StatusInternalServerError)
 			return

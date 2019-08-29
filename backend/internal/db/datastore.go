@@ -10,7 +10,6 @@ import (
 	"github.com/r-cbb/cbbpoll/internal/models"
 )
 
-// Eventually rename DatastoreClient to DatastoreClient and abstract out an interface type DatastoreClient
 type DatastoreClient struct {
 	client *datastore.Client
 }
