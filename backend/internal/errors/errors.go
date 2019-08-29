@@ -55,6 +55,8 @@ func E(args ...interface{}) error {
 			e.Kind = arg
 		case error:
 			e.Err = arg
+		case string:
+			e.Msg = arg
 		default:
 			panic("bad call to E")
 		}
@@ -63,15 +65,16 @@ func E(args ...interface{}) error {
 	return &e
 }
 
-func Ops(e *Error) []Op {
-	res := []Op{e.Op}
+func Ops(e error) []Op {
+	var res []Op
 
-	subErr, ok := e.Err.(*Error)
+	e1, ok := e.(*Error)
 	if !ok {
 		return res
 	}
 
-	res = append(res, Ops(subErr)...)
+	res = append(res, e1.Op)
+	res = append(res, Ops(e1.Err)...)
 
 	return res
 }
