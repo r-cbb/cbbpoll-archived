@@ -34,7 +34,7 @@ func (s *Server) AuthRoutes() {
 	newSession := s.router.HandleFunc("/sessions", s.handleNewSession()).Methods(http.MethodPost)
 
 	s.router.Use(s.AuthClient.Verifier())
-	s.router.Use(s.AuthClient.Authenticator([]*mux.Route{newSession}))
+	s.router.Use(SelectiveMiddleware(s.AuthClient.Authenticator, []*mux.Route{newSession}))
 }
 
 func (s *Server) handlePing() http.HandlerFunc {
