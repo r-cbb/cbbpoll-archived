@@ -249,3 +249,12 @@ func GetTestHandler() http.HandlerFunc {
 	}
 	return http.HandlerFunc(fn)
 }
+
+func TestJwtClient_UserTokenFromCtxError(t *testing.T) {
+	client := JwtClient{}
+	token := client.UserTokenFromCtx(context.WithValue(context.Background(), jwtauth.ErrorCtxKey, fmt.Errorf("some error")))
+	if token.LoggedIn() || token.IsAdmin {
+		t.Error("UserTokenFromCtx() with a token error in the context should not return a logged in user")
+	}
+
+}
