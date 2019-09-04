@@ -16,9 +16,10 @@ import (
 Server is a type that holds state for the app, along with routers and handlers.
 */
 type Server struct {
-	Db         db.DBClient
-	AuthClient auth.AuthClient
-	router     *mux.Router
+	Db           db.DBClient
+	AuthClient   auth.AuthClient
+	RedditClient RedditClient
+	router       *mux.Router
 }
 
 func NewServer() *Server {

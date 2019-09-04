@@ -160,7 +160,7 @@ func (s *Server) handleNewSession() http.HandlerFunc {
 
 		accessToken := strings.TrimSpace(splitHeader[1])
 
-		name, err := usernameFromRedditToken(accessToken)
+		name, err := s.RedditClient.UsernameFromToken(accessToken)
 		if err != nil {
 			if errors.Kind(err) == errors.KindAuthError {
 				s.respond(w, r, nil, http.StatusUnauthorized) // received a 401 from reddit

@@ -40,6 +40,9 @@ func main() {
 		log.Printf("\tUsing port %s from environment variable", port)
 	}
 
+	// Setup reddit client
+	server.RedditClient = app.NewRedditClient("https://oauth.reddit.com/api/v1/")
+
 	// TODO: flag to enable TLS
 
 	srv := &http.Server{

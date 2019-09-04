@@ -9,10 +9,27 @@ import (
 	"github.com/r-cbb/cbbpoll/internal/errors"
 )
 
-func usernameFromRedditToken(token string) (name string, err error) {
+type RedditClient interface {
+	UsernameFromToken(token string) (name string, err error)
+}
+
+type redditClient struct {
+	baseUrl string
+}
+
+func NewRedditClient(baseUrl string) RedditClient {
+	rc := redditClient{
+		baseUrl: baseUrl,
+	}
+
+	return rc
+}
+
+func (rc redditClient) UsernameFromToken(token string) (name string, err error) {
 	var op errors.Op = "reddit.usernameFromRedditToken"
-	var req *http.Request
-	req, err = http.NewRequest(http.MethodGet, "https://oauth.reddit.com/api/v1/me", nil)
+	url := rc.baseUrl + "me"
+
+	req, err := http.NewRequest(http.MethodGet, "https://oauth.reddit.com/api/v1/me", nil)
 	if err != nil {
 		return "", errors.E(op, err, "error creating http request")
 	}
@@ -32,7 +49,7 @@ func usernameFromRedditToken(token string) (name string, err error) {
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return "", errors.E(op, fmt.Errorf("reddit api returned status %d %s", resp.StatusCode, resp.Status))
+		return "", errors.E(op, fmt.Errorf("reddit api returned status %d %s", resp.StatusCode, resp.Status, errors.KindServiceUnavailable))
 	}
 
 	var content []byte
