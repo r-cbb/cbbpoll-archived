@@ -48,7 +48,6 @@ func InitJwtAuth(secretReader, publicReader io.Reader) (*JwtClient, error) {
 	return &JwtClient{auth: jwtauth.New("RS256", privateKey, pubKey)}, nil
 }
 
-// Pass context into here and ensure UserToken comes out
 func (j JwtClient) UserTokenFromCtx(ctx context.Context) (token models.UserToken) {
 	const op errors.Op = "auth.userFromContext"
 	_, claims, err := jwtauth.FromContext(ctx)
