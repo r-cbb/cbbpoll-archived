@@ -48,7 +48,6 @@ func InitJwtAuth(secretReader, publicReader io.Reader) (*JwtClient, error) {
 	return &JwtClient{auth: jwtauth.New("RS256", privateKey, pubKey)}, nil
 }
 
-// TODO: To test, write some code that places a jwt-go token into a Context under key jwtauth.TokenCtxKey
 // Pass context into here and ensure UserToken comes out
 func (j JwtClient) UserTokenFromCtx(ctx context.Context) (token models.UserToken) {
 	const op errors.Op = "auth.userFromContext"
@@ -77,10 +76,6 @@ func (j JwtClient) Verifier() func (http.Handler) http.Handler {
 	return jwtauth.Verifier(j.auth)
 }
 
-
-// TODO: To test, no way around it, going to have to make sure j.auth is a valid JWTAuth object (can reuse
-// code from test InitJwtAuth likely).  Pass in a user and then inspect the token that comes out.  (Can probably
-// just pass the token into the test for UserTokenFromCtx.)
 func (j JwtClient) CreateJWT(u models.User) (string, error) {
 	var op errors.Op = "auth.createJWT"
 	var claims jwtauth.Claims = make(map[string]interface{})

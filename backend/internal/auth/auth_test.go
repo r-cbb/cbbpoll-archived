@@ -178,3 +178,7 @@ func TestJwtClient_BadTokenIsLoggedOut(t *testing.T) {
 		t.Errorf("Bad token led to LoggedIn user")
 	}
 }
+
+func TestJwtClient_Authenticator(t *testing.T) {
+	t.Skip()
+}
