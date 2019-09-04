@@ -2,20 +2,19 @@ package auth
 
 import (
 	"context"
+	"io"
 	"io/ioutil"
 	"net/http"
 
 	"github.com/dgrijalva/jwt-go"
 	"github.com/go-chi/jwtauth"
-	"github.com/gorilla/mux"
-
 	"github.com/r-cbb/cbbpoll/internal/errors"
 	"github.com/r-cbb/cbbpoll/internal/models"
 )
 
 type AuthClient interface {
 	Verifier() func(http.Handler) http.Handler
-	Authenticator(ignoredRoutes []*mux.Route) func(http.Handler) http.Handler
+	Authenticator(http.HandlerFunc) http.HandlerFunc
 	CreateJWT(u models.User) (string, error)
 	UserTokenFromCtx(ctx context.Context) models.UserToken
 }
@@ -24,13 +23,11 @@ type JwtClient struct {
 	auth *jwtauth.JWTAuth
 }
 
-// TODO: change to take Readers instead of paths, ensure a JwtClient is created when
-// some hardcoded keys are passed in.
-func InitJwtAuth(secretPath, publicPath string) (*JwtClient, error) {
+func InitJwtAuth(secretReader, publicReader io.Reader) (*JwtClient, error) {
 	var op errors.Op = "auth.InitJwtAuth"
-	keytext, err := ioutil.ReadFile(secretPath)
+	keytext, err := ioutil.ReadAll(secretReader)
 	if err != nil {
-		return nil, errors.E(op, errors.KindJWTError, err, "error reading from secret key file")
+		return nil, errors.E(op, errors.KindJWTError, err, "error reading secret key")
 	}
 
 	privateKey, err := jwt.ParseRSAPrivateKeyFromPEM(keytext)
@@ -38,9 +35,9 @@ func InitJwtAuth(secretPath, publicPath string) (*JwtClient, error) {
 		return nil, errors.E(op, errors.KindJWTError, err, "error parsing private key")
 	}
 
-	pubtext, err := ioutil.ReadFile(publicPath)
+	pubtext, err := ioutil.ReadAll(publicReader)
 	if err != nil {
-		return nil, errors.E(op, errors.KindJWTError, err, "error reading from public key file")
+		return nil, errors.E(op, errors.KindJWTError, err, "error reading public key")
 	}
 
 	pubKey, err := jwt.ParseRSAPublicKeyFromPEM(pubtext)
@@ -98,30 +95,8 @@ func (j JwtClient) CreateJWT(u models.User) (string, error) {
 	return tokenString, nil
 }
 
-func (j JwtClient) Authenticator(excludes []*mux.Route) func(http.Handler) http.Handler {
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			curr := mux.CurrentRoute(r)
-			exclude := false
-			for _, e := range excludes {
-				if e == curr {
-					exclude = true
-					break
-				}
-			}
-
-			if exclude {
-				next.ServeHTTP(w, r)
-				return
-			} else {
-				j.authenticatorHelper(next).ServeHTTP(w, r)
-				return
-			}
-		})
-	}
-}
-
-func (j JwtClient) authenticatorHelper(next http.Handler) http.Handler {
+// should be able to test this
+func (j JwtClient) Authenticator(next http.HandlerFunc) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		token, _, err := jwtauth.FromContext(r.Context())
 
