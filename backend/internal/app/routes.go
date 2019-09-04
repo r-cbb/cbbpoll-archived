@@ -11,8 +11,6 @@ import (
 	"github.com/r-cbb/cbbpoll/internal/models"
 )
 
-// TODO split routes/handlers
-
 func (s *Server) Routes() {
 	s.router = mux.NewRouter()
 
@@ -132,7 +130,7 @@ func (s *Server) handleGetUser() http.HandlerFunc {
 		vars := mux.Vars(r)
 		name := vars["name"]
 
-		team, err := s.Db.GetUser(name)
+		user, err := s.Db.GetUser(name)
 		if err != nil {
 			if errors.Kind(err) == errors.KindNotFound {
 				s.respond(w, r, nil, http.StatusNotFound)
@@ -143,7 +141,7 @@ func (s *Server) handleGetUser() http.HandlerFunc {
 			return
 		}
 
-		s.respond(w, r, team, http.StatusOK)
+		s.respond(w, r, user, http.StatusOK)
 		return
 	}
 }
@@ -190,7 +188,7 @@ func (s *Server) handleNewSession() http.HandlerFunc {
 			newUser = true
 		}
 
-		out, err := s.AuthClient.CreateJWT(user)
+		token, err := s.AuthClient.CreateJWT(user)
 		if err != nil {
 			s.respond(w, r, nil, http.StatusInternalServerError)
 			return
@@ -201,7 +199,7 @@ func (s *Server) handleNewSession() http.HandlerFunc {
 			Token string
 		}{
 			Nickname: name,
-			Token: out,
+			Token:    token,
 		}
 
 		var status = http.StatusOK

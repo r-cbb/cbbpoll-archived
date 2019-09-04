@@ -41,10 +41,10 @@ func main() {
 	}
 
 	// Setup reddit client
+	// TODO read from config
 	server.RedditClient = app.NewRedditClient("https://oauth.reddit.com/api/v1/")
 
 	// TODO: flag to enable TLS
-
 	srv := &http.Server{
 		Handler: server,
 		Addr:    fmt.Sprintf(":%s", port),
@@ -53,7 +53,6 @@ func main() {
 	}
 
 	log.Println("Serving...")
-
 	log.Println(srv.ListenAndServe())
 }
 
@@ -62,11 +61,13 @@ func setupAuth(server *app.Server) {
 	if err != nil {
 		log.Fatalf("error opening secret key file: %s", err.Error())
 	}
+	defer keyFile.Close()
 
 	pubKeyFile, err := os.Open("jwtRS256.key.pub")
 	if err != nil {
 		log.Fatalf("error opening public key file: %s", err.Error())
 	}
+	defer pubKeyFile.Close()
 
 	server.AuthClient, err = auth.InitJwtAuth(keyFile, pubKeyFile)
 	if err != nil {
@@ -74,15 +75,5 @@ func setupAuth(server *app.Server) {
 	} else {
 		server.AuthRoutes()
 		log.Println("\tJWT Auth initialized")
-	}
-
-	err = keyFile.Close()
-	if err != nil {
-		log.Fatalf("error closing secret key file: %s", err.Error())
-	}
-
-	err = pubKeyFile.Close()
-	if err != nil {
-		log.Fatalf("error closing public key file: %s", err.Error())
 	}
 }

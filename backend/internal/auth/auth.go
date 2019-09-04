@@ -90,7 +90,6 @@ func (j JwtClient) CreateJWT(u models.User) (string, error) {
 	return tokenString, nil
 }
 
-// should be able to test this
 func (j JwtClient) Authenticator(next http.HandlerFunc) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		token, _, err := jwtauth.FromContext(r.Context())
