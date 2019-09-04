@@ -3,10 +3,16 @@ package auth
 import (
 	"bytes"
 	"context"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"testing"
+
+	jwt2 "github.com/dgrijalva/jwt-go"
 	"github.com/go-chi/jwtauth"
+
 	"github.com/r-cbb/cbbpoll/internal/errors"
 	"github.com/r-cbb/cbbpoll/internal/models"
-	"testing"
 )
 
 const publicKeyText = `-----BEGIN PUBLIC KEY-----
@@ -47,7 +53,7 @@ y18Ae9n7dHVueyslrb6weq7dTkYDi3iOYRW8HRkIQh06wEdbxt0shTzAJvvCQfrB
 jg/3747WSsf/zBTcHihTRBdAv6OmdhV4/dD5YBfLAkLrd+mX7iE=
 -----END RSA PRIVATE KEY-----`
 
-type errorReader struct {}
+type errorReader struct{}
 
 func (errorReader) Read(p []byte) (n int, err error) {
 	return 0, errors.E("Some IO error")
@@ -123,7 +129,7 @@ func TestJwtClient_EncodeDecode(t *testing.T) {
 
 	u := models.User{
 		Nickname: "Concision",
-		IsAdmin: true,
+		IsAdmin:  true,
 	}
 
 	jwtStr, err := client.CreateJWT(u)
@@ -180,5 +186,66 @@ func TestJwtClient_BadTokenIsLoggedOut(t *testing.T) {
 }
 
 func TestJwtClient_Authenticator(t *testing.T) {
-	t.Skip()
+	token := jwt2.Token{Claims: jwt2.MapClaims{"foo": "bar"}, Valid: true}
+	badToken := token
+	badToken.Valid = false
+	jwt := JwtClient{}
+	tests := []struct {
+		description  string
+		ctx          context.Context
+		expectedCode int
+	}{
+		{
+			description:  "No token",
+			ctx:          context.Background(),
+			expectedCode: http.StatusOK,
+		},
+		{
+			description: "Good token",
+			ctx: context.WithValue(
+				context.WithValue(
+					context.Background(),
+					jwtauth.TokenCtxKey,
+					&token),
+				jwtauth.ErrorCtxKey,
+				nil),
+			expectedCode: http.StatusOK,
+		},
+		{
+			description: "Error retrieving token",
+			ctx: context.WithValue(
+				context.WithValue(
+					context.Background(),
+					jwtauth.TokenCtxKey,
+					&token),
+				jwtauth.ErrorCtxKey,
+				fmt.Errorf("Some error")),
+			expectedCode: http.StatusUnauthorized,
+		},
+		{
+			description:  "Invalid token",
+			ctx:          context.WithValue(context.Background(), jwtauth.TokenCtxKey, &badToken),
+			expectedCode: http.StatusUnauthorized,
+		},
+	}
+
+	handler := jwt.Authenticator(GetTestHandler())
+
+	for _, test := range tests {
+		w := httptest.NewRecorder()
+		r := httptest.NewRequest(http.MethodGet, "http://cbbpoll.com", nil)
+		r = r.WithContext(test.ctx)
+
+		handler.ServeHTTP(w, r)
+		if w.Result().StatusCode != test.expectedCode {
+			t.Errorf("Expected status code: %v, received: %v", test.expectedCode, w.Result().StatusCode)
+		}
+	}
+}
+
+func GetTestHandler() http.HandlerFunc {
+	fn := func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}
+	return http.HandlerFunc(fn)
 }

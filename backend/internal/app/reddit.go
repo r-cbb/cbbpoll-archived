@@ -29,7 +29,7 @@ func (rc redditClient) UsernameFromToken(token string) (name string, err error) 
 	var op errors.Op = "reddit.usernameFromRedditToken"
 	url := rc.baseUrl + "me"
 
-	req, err := http.NewRequest(http.MethodGet, "https://oauth.reddit.com/api/v1/me", nil)
+	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
 		return "", errors.E(op, err, "error creating http request")
 	}
@@ -49,7 +49,7 @@ func (rc redditClient) UsernameFromToken(token string) (name string, err error) 
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return "", errors.E(op, fmt.Errorf("reddit api returned status %d %s", resp.StatusCode, resp.Status, errors.KindServiceUnavailable))
+		return "", errors.E(op, fmt.Errorf("reddit api returned status %d %s", resp.StatusCode, resp.Status), errors.KindServiceUnavailable)
 	}
 
 	var content []byte
