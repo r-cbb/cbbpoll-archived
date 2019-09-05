@@ -1,10 +1,11 @@
 package app
 
 import (
-	"github.com/gorilla/mux"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/gorilla/mux"
 )
 
 func TestSelectiveMiddleware(t *testing.T) {

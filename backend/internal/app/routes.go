@@ -71,13 +71,13 @@ func (s *Server) handleGetTeam() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		vars := mux.Vars(r)
 		id := vars["id"]
-		intId, err := strconv.Atoi(id)
+		intId, err := strconv.ParseInt(id, 10, 64)
 		if err != nil {
 			s.respond(w, r, nil, http.StatusBadRequest)
 			return
 		}
 
-		team, err := s.Db.GetTeam(int64(intId))
+		team, err := s.Db.GetTeam(intId)
 		if err != nil {
 			if errors.Kind(err) == errors.KindNotFound {
 				s.respond(w, r, nil, http.StatusNotFound)
