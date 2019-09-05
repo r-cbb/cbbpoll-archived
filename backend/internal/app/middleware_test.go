@@ -1,18 +1,10 @@
 package app
 
 import (
-	"context"
 	"github.com/gorilla/mux"
 	"net/http"
 	"net/http/httptest"
 	"testing"
-)
-
-type contextKey int
-
-const (
-	varsKey contextKey = iota
-	routeKey
 )
 
 func TestSelectiveMiddleware(t *testing.T) {
@@ -31,20 +23,17 @@ func TestSelectiveMiddleware(t *testing.T) {
 
 	tests := []struct {
 		description  string
-		ctx          context.Context
-		path string
+		path         string
 		expectedCode int
 	}{
 		{
 			description:  "No Match",
-			path: "/bar",
-			ctx:          context.Background(),
+			path:         "/bar",
 			expectedCode: http.StatusBadRequest,
 		},
 		{
 			description:  "Match",
-			path: "/foo",
-			ctx:          context.WithValue(context.Background(), routeKey, ignoredRoute),
+			path:         "/foo",
 			expectedCode: http.StatusOK,
 		},
 	}
