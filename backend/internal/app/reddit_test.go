@@ -2,10 +2,11 @@ package app
 
 import (
 	"encoding/json"
-	"github.com/r-cbb/cbbpoll/internal/errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/r-cbb/cbbpoll/internal/errors"
 )
 
 var token = "This is the token"
