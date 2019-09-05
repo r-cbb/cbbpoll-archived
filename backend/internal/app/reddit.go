@@ -26,8 +26,8 @@ func NewRedditClient(baseUrl string) RedditClient {
 }
 
 func (rc redditClient) UsernameFromToken(token string) (name string, err error) {
-	var op errors.Op = "reddit.usernameFromRedditToken"
-	url := rc.baseUrl + "me"
+	var op errors.Op = "reddit.UsernameFromToken"
+	url := rc.baseUrl + "/me"
 
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {

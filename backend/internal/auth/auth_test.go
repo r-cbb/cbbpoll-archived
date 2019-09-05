@@ -232,14 +232,16 @@ func TestJwtClient_Authenticator(t *testing.T) {
 	handler := jwt.Authenticator(GetTestHandler())
 
 	for _, test := range tests {
-		w := httptest.NewRecorder()
-		r := httptest.NewRequest(http.MethodGet, "http://cbbpoll.com", nil)
-		r = r.WithContext(test.ctx)
+		t.Run(test.description, func(t *testing.T) {
+			w := httptest.NewRecorder()
+			r := httptest.NewRequest(http.MethodGet, "http://cbbpoll.com", nil)
+			r = r.WithContext(test.ctx)
 
-		handler.ServeHTTP(w, r)
-		if w.Result().StatusCode != test.expectedCode {
-			t.Errorf("Expected status code: %v, received: %v", test.expectedCode, w.Result().StatusCode)
-		}
+			handler.ServeHTTP(w, r)
+			if w.Result().StatusCode != test.expectedCode {
+				t.Errorf("Expected status code: %v, received: %v", test.expectedCode, w.Result().StatusCode)
+			}
+		})
 	}
 }
 

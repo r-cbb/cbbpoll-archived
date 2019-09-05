@@ -48,6 +48,28 @@ func addTeamConcurrencyError() mocks.DBClient {
 	return myMock
 }
 
+func TestPing(t *testing.T) {
+	srv := NewServer()
+
+	r := httptest.NewRequest(http.MethodGet, "/ping", nil)
+	w := httptest.NewRecorder()
+
+	srv.ServeHTTP(w, r)
+	if w.Result().StatusCode != http.StatusOK {
+		t.Errorf("Expected StatusOK, got: %v %v", w.Result().StatusCode, w.Result().Status)
+	}
+
+	bodyBytes, _ := ioutil.ReadAll(w.Body)
+	bs := string(bodyBytes)
+
+	expected, _ := json.Marshal(struct{Version string}{Version: srv.version()})
+	expStr := string(expected) + "\n"
+
+	if bs != expStr {
+		t.Errorf("Response body differs.  Expected: %v, Got: %v", bs, expStr)
+	}
+}
+
 func TestAddTeam(t *testing.T) {
 	testTeamJson, err := json.Marshal(returnedTeam)
 	if err != nil {
@@ -109,7 +131,7 @@ func TestAddTeam(t *testing.T) {
 				return
 			}
 
-			bodyBytes, err := ioutil.ReadAll(w.Body)
+			bodyBytes, _ := ioutil.ReadAll(w.Body)
 			bs := string(bodyBytes)
 
 			if bs != test.expectedBody {
