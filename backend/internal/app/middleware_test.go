@@ -39,16 +39,18 @@ func TestSelectiveMiddleware(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		url := ts.URL + test.path
-		resp, err := http.Get(url)
+		t.Run(test.description, func(t *testing.T) {
+			url := ts.URL + test.path
+			resp, err := http.Get(url)
 
-		if err != nil {
-			t.Errorf("unexpected error from http.get: %v", err.Error())
-		}
+			if err != nil {
+				t.Errorf("unexpected error from http.get: %v", err.Error())
+			}
 
-		if resp.StatusCode != test.expectedCode {
-			t.Errorf("Expected status code: %v, received: %v", test.expectedCode, resp.StatusCode)
-		}
+			if resp.StatusCode != test.expectedCode {
+				t.Errorf("Expected status code: %v, received: %v", test.expectedCode, resp.StatusCode)
+			}
+		})
 	}
 }
 

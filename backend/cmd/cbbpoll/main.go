@@ -42,7 +42,7 @@ func main() {
 
 	// Setup reddit client
 	// TODO read from config
-	server.RedditClient = app.NewRedditClient("https://oauth.reddit.com/api/v1/")
+	server.RedditClient = app.NewRedditClient("https://oauth.reddit.com/api/v1")
 
 	// TODO: flag to enable TLS
 	srv := &http.Server{
