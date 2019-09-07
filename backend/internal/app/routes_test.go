@@ -34,21 +34,21 @@ var testArizona = models.Team{
 }
 
 var testOhioState = models.Team{
-	ID: 2,
-	FullName: "Ohio State University",
-	ShortName: "Ohio State",
-	Nickname: "Buckeyes",
+	ID:         2,
+	FullName:   "Ohio State University",
+	ShortName:  "Ohio State",
+	Nickname:   "Buckeyes",
 	Conference: "Big-10",
 }
 
-var testAdmin = models.User {
+var testAdmin = models.User{
 	Nickname: "Concision",
-	IsAdmin: true,
+	IsAdmin:  true,
 }
 
-var testUser = models.User {
+var testUser = models.User{
 	Nickname: "JohnDoe",
-	IsAdmin: false,
+	IsAdmin:  false,
 }
 
 func addTeamMockDb() mocks.DBClient {
@@ -286,7 +286,7 @@ func TestListTeams(t *testing.T) {
 		name           string
 		expectedStatus int
 		mockDb         mocks.DBClient
-		expectedTeams []models.Team
+		expectedTeams  []models.Team
 	}{
 		{
 			name:           "No Teams",
@@ -297,18 +297,18 @@ func TestListTeams(t *testing.T) {
 			name:           "One Team",
 			expectedStatus: http.StatusOK,
 			mockDb:         getDb([]models.Team{testArizona}, nil),
-			expectedTeams: []models.Team{testArizona},
+			expectedTeams:  []models.Team{testArizona},
 		},
 		{
 			name:           "Two Teams",
 			expectedStatus: http.StatusOK,
 			mockDb:         getDb([]models.Team{testArizona, testOhioState}, nil),
-			expectedTeams: []models.Team{testArizona, testOhioState},
+			expectedTeams:  []models.Team{testArizona, testOhioState},
 		},
 		{
-			name: "Database Error",
+			name:           "Database Error",
 			expectedStatus: http.StatusInternalServerError,
-			mockDb: getDb(nil, errors.E()),
+			mockDb:         getDb(nil, errors.E()),
 		},
 	}
 
@@ -352,13 +352,13 @@ func TestGetUser(t *testing.T) {
 		name           string
 		expectedStatus int
 		mockDb         mocks.DBClient
-		expectedUser  models.User
+		expectedUser   models.User
 	}{
 		{
 			name:           "OK",
 			expectedStatus: http.StatusOK,
 			mockDb:         getDb(testUser.Nickname, testUser, nil),
-			expectedUser: testUser,
+			expectedUser:   testUser,
 		},
 		{
 			name:           "Not found",
@@ -366,9 +366,9 @@ func TestGetUser(t *testing.T) {
 			mockDb:         getDb(testUser.Nickname, models.User{}, errors.E(errors.KindNotFound)),
 		},
 		{
-			name: "Database Error",
+			name:           "Database Error",
 			expectedStatus: http.StatusInternalServerError,
-			mockDb: getDb(testUser.Nickname, models.User{}, errors.E()),
+			mockDb:         getDb(testUser.Nickname, models.User{}, errors.E()),
 		},
 	}
 
@@ -399,7 +399,120 @@ func TestGetUser(t *testing.T) {
 			}
 		})
 	}
+}
 
+type mockRedditClient struct {
+	token string
+	name  string
+	err   error
+}
+
+func (c mockRedditClient) UsernameFromToken(token string) (name string, err error) {
+	if token != c.token {
+		panic("tokens don't match")
+	}
+	return c.name, c.err
+}
+
+func newMockRedditClient(expToken string, name string, err error) mockRedditClient {
+	return mockRedditClient{
+		token: expToken,
+		name:  name,
+		err:   err,
+	}
+}
+
+func TestNewSession(t *testing.T) {
+	const redditToken = "some.reddit.token"
+	const expectedToken = "some.token.value"
+
+	getDb := func(nick string, user models.User, err error, err2 error) mocks.DBClient {
+		myMock := mocks.DBClient{}
+		myMock.On("GetUser", nick).Return(user, err)
+		myMock.On("AddUser", mock.AnythingOfType("models.User")).Return(user, err2)
+		return myMock
+	}
+
+	getAuth := func(token string, err error) authMocks.AuthClient {
+		myMock := authMocks.AuthClient{}
+		myMock.On("CreateJWT", testUser).Return(token, err)
+		myMock.On("Verifier").Return(func(next http.Handler) http.Handler {
+			return http.Handler(next)
+		})
+		return myMock
+	}
+
+	tests := []struct {
+		name           string
+		expectedStatus int
+		mockDb         mocks.DBClient
+		mockAuth       authMocks.AuthClient
+		redditClient   mockRedditClient
+		redditToken    string
+	}{
+		{
+			name:           "OK",
+			expectedStatus: http.StatusOK,
+			mockDb:         getDb(testUser.Nickname, testUser, nil, nil),
+			mockAuth:       getAuth(expectedToken, nil),
+			redditClient:   newMockRedditClient(redditToken, testUser.Nickname, nil),
+			redditToken:    redditToken,
+		},
+		{
+			name:           "BadRequest",
+			expectedStatus: http.StatusBadRequest,
+			mockDb:         getDb(testUser.Nickname, testUser, nil, nil),
+			mockAuth:       getAuth(expectedToken, nil),
+			redditClient:   newMockRedditClient(redditToken, testUser.Nickname, nil),
+			redditToken:    "Bearer Bearer Bearer Token",
+		},
+		{
+			name:           "Unauthorized Reddit Token",
+			expectedStatus: http.StatusUnauthorized,
+			mockDb:         getDb(testUser.Nickname, testUser, nil, nil),
+			mockAuth:       getAuth(expectedToken, nil),
+			redditClient:   newMockRedditClient(redditToken, testUser.Nickname, errors.E(errors.KindAuthError)),
+			redditToken:    redditToken,
+		},
+		{
+			name:           "Reddit Unavailable",
+			expectedStatus: http.StatusServiceUnavailable,
+			mockDb:         getDb(testUser.Nickname, testUser, nil, nil),
+			mockAuth:       getAuth(expectedToken, nil),
+			redditClient:   newMockRedditClient(redditToken, testUser.Nickname, errors.E(errors.KindServiceUnavailable)),
+			redditToken:    redditToken,
+		},
+		{
+			name:           "New User",
+			expectedStatus: http.StatusCreated,
+			mockDb:         getDb(testUser.Nickname, testUser, errors.E(errors.KindNotFound), nil),
+			mockAuth:       getAuth(expectedToken, nil),
+			redditClient:   newMockRedditClient(redditToken, testUser.Nickname, nil),
+			redditToken:    redditToken,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			srv := NewServer()
+			srv.Db = &test.mockDb
+			srv.RedditClient = test.redditClient
+			srv.AuthClient = &test.mockAuth
+			srv.AuthRoutes()
+
+			r := httptest.NewRequest(http.MethodPost, "/v1/sessions", nil)
+			r.Header.Set("Authorization", fmt.Sprintf("Bearer %s", test.redditToken))
+			w := httptest.NewRecorder()
+			srv.ServeHTTP(w, r)
+			if w.Result().StatusCode != test.expectedStatus {
+				t.Errorf("POST /v1/sessions returned %v, expected %v", w.Result().StatusCode, test.expectedStatus)
+			}
+
+			if !testSuccess(w.Result().StatusCode) {
+				return
+			}
+		})
+	}
 }
 
 // Helpers
