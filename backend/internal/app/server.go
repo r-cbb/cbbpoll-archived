@@ -20,10 +20,13 @@ type Server struct {
 	AuthClient   auth.AuthClient
 	RedditClient RedditClient
 	router       *mux.Router
+	v            map[int]*mux.Router
 }
 
 func NewServer() *Server {
 	srv := Server{}
+	srv.v = make(map[int]*mux.Router)
+
 	srv.Routes()
 
 	return &srv

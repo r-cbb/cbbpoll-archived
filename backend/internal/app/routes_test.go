@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/mock"
@@ -17,44 +18,62 @@ import (
 	"github.com/r-cbb/cbbpoll/internal/models"
 )
 
-var testTeam = models.Team {
+var inputTeam = models.Team{
 	FullName:   "University of Arizona",
 	ShortName:  "Arizona",
 	Nickname:   "Wildcats",
 	Conference: "Pac-12",
 }
 
-var returnedTeam = models.Team{
-	ID: 1,
+var testArizona = models.Team{
+	ID:         1,
 	FullName:   "University of Arizona",
 	ShortName:  "Arizona",
 	Nickname:   "Wildcats",
 	Conference: "Pac-12",
+}
+
+var testOhioState = models.Team{
+	ID: 2,
+	FullName: "Ohio State University",
+	ShortName: "Ohio State",
+	Nickname: "Buckeyes",
+	Conference: "Big-10",
+}
+
+var testAdmin = models.User {
+	Nickname: "Concision",
+	IsAdmin: true,
+}
+
+var testUser = models.User {
+	Nickname: "JohnDoe",
+	IsAdmin: false,
 }
 
 func addTeamMockDb() mocks.DBClient {
 	myMock := mocks.DBClient{}
-	myMock.On("AddTeam", testTeam).Return(returnedTeam, nil).Once()
+	myMock.On("AddTeam", inputTeam).Return(testArizona, nil).Once()
 	return myMock
 }
 
 func addTeamDbError() mocks.DBClient {
 	myMock := mocks.DBClient{}
-	myMock.On("AddTeam", testTeam).Return(models.Team{}, fmt.Errorf("some error")).Once()
+	myMock.On("AddTeam", inputTeam).Return(models.Team{}, fmt.Errorf("some error")).Once()
 	return myMock
 }
 
 func addTeamConcurrencyError() mocks.DBClient {
 	myMock := mocks.DBClient{}
-	myMock.On("AddTeam", testTeam).Return(models.Team{}, errors.E(errors.KindConcurrencyProblem, fmt.Errorf("some error"))).Once()
-	myMock.On("AddTeam", testTeam).Return(returnedTeam, nil).Once()
+	myMock.On("AddTeam", inputTeam).Return(models.Team{}, errors.E(errors.KindConcurrencyProblem, fmt.Errorf("some error"))).Once()
+	myMock.On("AddTeam", inputTeam).Return(testArizona, nil).Once()
 	return myMock
 }
 
 func TestAddTeam(t *testing.T) {
-	testTeamJson, err := json.Marshal(returnedTeam)
+	testTeamJson, err := json.Marshal(testArizona)
 	if err != nil {
-		panic("Couldn't marshal testTeam")
+		panic("Couldn't marshal inputTeam")
 	}
 	testTeamStr := string(testTeamJson) + "\n"
 
@@ -67,7 +86,7 @@ func TestAddTeam(t *testing.T) {
 	}{
 		{
 			name:           "Successful add",
-			input:          testTeam,
+			input:          inputTeam,
 			expectedStatus: http.StatusOK,
 			expectedBody:   testTeamStr,
 			mockDb:         addTeamMockDb(),
@@ -79,13 +98,13 @@ func TestAddTeam(t *testing.T) {
 		},
 		{
 			name:           "Database error",
-			input:          testTeam,
+			input:          inputTeam,
 			expectedStatus: http.StatusInternalServerError,
 			mockDb:         addTeamDbError(),
 		},
 		{
 			name:           "Concurrency Retry",
-			input:          testTeam,
+			input:          inputTeam,
 			expectedStatus: http.StatusOK,
 			expectedBody:   testTeamStr,
 			mockDb:         addTeamConcurrencyError(),
@@ -104,7 +123,7 @@ func TestAddTeam(t *testing.T) {
 				return
 			}
 
-			r := httptest.NewRequest(http.MethodPost, "/teams", &buf)
+			r := httptest.NewRequest(http.MethodPost, "/v1/teams", &buf)
 			w := httptest.NewRecorder()
 			srv.ServeHTTP(w, r)
 			if w.Result().StatusCode != test.expectedStatus {
@@ -129,7 +148,7 @@ func TestAddTeam(t *testing.T) {
 func TestPing(t *testing.T) {
 	srv := NewServer()
 
-	r := httptest.NewRequest(http.MethodGet, "/ping", nil)
+	r := httptest.NewRequest(http.MethodGet, "/v1/ping", nil)
 	w := httptest.NewRecorder()
 
 	srv.ServeHTTP(w, r)
@@ -140,7 +159,7 @@ func TestPing(t *testing.T) {
 	bodyBytes, _ := ioutil.ReadAll(w.Body)
 	bs := string(bodyBytes)
 
-	expected, _ := json.Marshal(struct{Version string}{Version: srv.version()})
+	expected, _ := json.Marshal(struct{ Version string }{Version: srv.version()})
 	expStr := string(expected) + "\n"
 
 	if bs != expStr {
@@ -148,72 +167,7 @@ func TestPing(t *testing.T) {
 	}
 }
 
-func getTeamMock() mocks.DBClient {
-	myMock := mocks.DBClient{}
-	myMock.On("GetTeam", int64(23)).Return(testTeam, nil).Once()
-	return myMock
-}
-
-func getTeamNotFoundMock() mocks.DBClient {
-	myMock := mocks.DBClient{}
-	myMock.On("GetTeam", int64(23)).Return(models.Team{}, errors.E(errors.KindNotFound)).Once()
-	return myMock
-}
-
-func getTeamErrorMock() mocks.DBClient {
-	myMock := mocks.DBClient{}
-	myMock.On("GetTeam", int64(23)).Return(models.Team{}, fmt.Errorf("some error")).Once()
-	return myMock
-}
-
-func Test_GetTeam(t *testing.T) {
-	tests := []struct {
-		name           string
-		expectedStatus int
-		expectedTeam   models.Team
-		mockDb         mocks.DBClient
-	}{
-		{
-			name:           "Success",
-			expectedStatus: http.StatusOK,
-			expectedTeam:   testTeam,
-			mockDb:         getTeamMock(),
-		},
-		{
-			name:           "Not Found",
-			expectedStatus: http.StatusNotFound,
-			mockDb:         getTeamNotFoundMock(),
-		},
-		{
-			name:           "Database error",
-			expectedStatus: http.StatusInternalServerError,
-			mockDb:         getTeamErrorMock(),
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			srv := NewServer()
-			srv.Db = &test.mockDb
-
-			r := httptest.NewRequest(http.MethodGet, "/teams/23", nil)
-			w := httptest.NewRecorder()
-			srv.ServeHTTP(w, r)
-			if w.Result().StatusCode != test.expectedStatus {
-				t.Errorf("GetTeam returned %v, expected %v", w.Result().StatusCode, test.expectedStatus)
-				return
-			}
-		})
-	}
-}
-
-func Test_GetMe(t *testing.T) {
-	getAuth := func(token models.UserToken) authMocks.AuthClient {
-		myMock := authMocks.AuthClient{}
-		myMock.On("UserTokenFromCtx", mock.Anything).Return(token)
-		return myMock
-	}
-
+func TestGetMe(t *testing.T) {
 	getDb := func(nick string, user models.User, err error) mocks.DBClient {
 		myMock := mocks.DBClient{}
 		myMock.On("GetUser", nick).Return(user, err)
@@ -221,27 +175,27 @@ func Test_GetMe(t *testing.T) {
 	}
 
 	tests := []struct {
-		name string
+		name           string
 		expectedStatus int
-		mockDb mocks.DBClient
-		authClient authMocks.AuthClient
-	} {
+		mockDb         mocks.DBClient
+		authClient     authMocks.AuthClient
+	}{
 		{
-			name: "Success",
+			name:           "Success",
 			expectedStatus: http.StatusOK,
-			mockDb: getDb("Concision", models.User{Nickname: "Concision", IsAdmin:true}, nil),
-			authClient: getAuth(models.UserToken{Nickname: "Concision"}),
+			mockDb:         getDb("Concision", models.User{Nickname: "Concision", IsAdmin: true}, nil),
+			authClient:     getAuth(models.UserToken{Nickname: "Concision"}),
 		},
 		{
-			name: "Not logged in",
+			name:           "Not logged in",
 			expectedStatus: http.StatusUnauthorized,
-			authClient: getAuth(models.UserToken{}),
+			authClient:     getAuth(models.UserToken{}),
 		},
 		{
-			name: "Database error",
+			name:           "Database error",
 			expectedStatus: http.StatusInternalServerError,
-			mockDb: getDb("Concision", models.User{}, fmt.Errorf("Some error")),
-			authClient: getAuth(models.UserToken{Nickname: "Concision"}),
+			mockDb:         getDb("Concision", models.User{}, fmt.Errorf("Some error")),
+			authClient:     getAuth(models.UserToken{Nickname: "Concision"}),
 		},
 	}
 
@@ -251,7 +205,7 @@ func Test_GetMe(t *testing.T) {
 			srv.Db = &test.mockDb
 			srv.AuthClient = &test.authClient
 
-			r := httptest.NewRequest(http.MethodGet, "/users/me", nil)
+			r := httptest.NewRequest(http.MethodGet, "/v1/users/me", nil)
 			w := httptest.NewRecorder()
 			srv.ServeHTTP(w, r)
 			if w.Result().StatusCode != test.expectedStatus {
@@ -260,4 +214,202 @@ func Test_GetMe(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestGetTeam(t *testing.T) {
+	getDb := func(id int64, team models.Team, err error) mocks.DBClient {
+		myMock := mocks.DBClient{}
+		myMock.On("GetTeam", id).Return(team, err)
+		return myMock
+	}
+
+	tests := []struct {
+		name           string
+		expectedStatus int
+		mockDb         mocks.DBClient
+	}{
+		{
+			name:           "Success",
+			expectedStatus: http.StatusOK,
+			mockDb:         getDb(int64(1), testArizona, nil),
+		},
+		{
+			name:           "Not found",
+			expectedStatus: http.StatusNotFound,
+			mockDb:         getDb(int64(1), models.Team{}, errors.E(errors.KindNotFound)),
+		},
+		{
+			name:           "DB Error",
+			expectedStatus: http.StatusInternalServerError,
+			mockDb:         getDb(int64(1), models.Team{}, errors.E()),
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			srv := NewServer()
+			srv.Db = &test.mockDb
+
+			r := httptest.NewRequest(http.MethodGet, "/v1/teams/1", nil)
+			w := httptest.NewRecorder()
+			srv.ServeHTTP(w, r)
+			if w.Result().StatusCode != test.expectedStatus {
+				t.Errorf("/teams/1 returned %v, expected %v", w.Result().StatusCode, test.expectedStatus)
+			}
+
+			if !testSuccess(w.Result().StatusCode) {
+				return
+			}
+
+			var res models.Team
+			err := json.NewDecoder(w.Body).Decode(&res)
+			if err != nil {
+				t.Errorf("Error decoding json response: %v", err.Error())
+			}
+
+			if res != testArizona {
+				t.Errorf("Expected Team  %v, got %v", testArizona, res)
+			}
+
+		})
+	}
+}
+
+func TestListTeams(t *testing.T) {
+	getDb := func(teams []models.Team, err error) mocks.DBClient {
+		myMock := mocks.DBClient{}
+		myMock.On("GetTeams").Return(teams, err)
+		return myMock
+	}
+
+	tests := []struct {
+		name           string
+		expectedStatus int
+		mockDb         mocks.DBClient
+		expectedTeams []models.Team
+	}{
+		{
+			name:           "No Teams",
+			expectedStatus: http.StatusOK,
+			mockDb:         getDb(nil, nil),
+		},
+		{
+			name:           "One Team",
+			expectedStatus: http.StatusOK,
+			mockDb:         getDb([]models.Team{testArizona}, nil),
+			expectedTeams: []models.Team{testArizona},
+		},
+		{
+			name:           "Two Teams",
+			expectedStatus: http.StatusOK,
+			mockDb:         getDb([]models.Team{testArizona, testOhioState}, nil),
+			expectedTeams: []models.Team{testArizona, testOhioState},
+		},
+		{
+			name: "Database Error",
+			expectedStatus: http.StatusInternalServerError,
+			mockDb: getDb(nil, errors.E()),
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			srv := NewServer()
+			srv.Db = &test.mockDb
+
+			r := httptest.NewRequest(http.MethodGet, "/v1/teams", nil)
+			w := httptest.NewRecorder()
+			srv.ServeHTTP(w, r)
+			if w.Result().StatusCode != test.expectedStatus {
+				t.Errorf("/teams returned %v, expected %v", w.Result().StatusCode, test.expectedStatus)
+			}
+
+			if !testSuccess(w.Result().StatusCode) {
+				return
+			}
+
+			var res []models.Team
+			err := json.NewDecoder(w.Body).Decode(&res)
+			if err != nil {
+				t.Errorf("Error decoding json response: %v", err.Error())
+			}
+
+			if !reflect.DeepEqual(res, test.expectedTeams) {
+				t.Errorf("Expected Teams %v, got %v", test.expectedTeams, res)
+			}
+		})
+	}
+}
+
+func TestGetUser(t *testing.T) {
+	getDb := func(nick string, user models.User, err error) mocks.DBClient {
+		myMock := mocks.DBClient{}
+		myMock.On("GetUser", nick).Return(user, err)
+		return myMock
+	}
+
+	tests := []struct {
+		name           string
+		expectedStatus int
+		mockDb         mocks.DBClient
+		expectedUser  models.User
+	}{
+		{
+			name:           "OK",
+			expectedStatus: http.StatusOK,
+			mockDb:         getDb(testUser.Nickname, testUser, nil),
+			expectedUser: testUser,
+		},
+		{
+			name:           "Not found",
+			expectedStatus: http.StatusNotFound,
+			mockDb:         getDb(testUser.Nickname, models.User{}, errors.E(errors.KindNotFound)),
+		},
+		{
+			name: "Database Error",
+			expectedStatus: http.StatusInternalServerError,
+			mockDb: getDb(testUser.Nickname, models.User{}, errors.E()),
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			srv := NewServer()
+			srv.Db = &test.mockDb
+
+			r := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/v1/users/%s", testUser.Nickname), nil)
+			w := httptest.NewRecorder()
+			srv.ServeHTTP(w, r)
+			if w.Result().StatusCode != test.expectedStatus {
+				t.Errorf("/v1/users/%s returned %v, expected %v", testUser.Nickname, w.Result().StatusCode, test.expectedStatus)
+			}
+
+			if !testSuccess(w.Result().StatusCode) {
+				return
+			}
+
+			var res models.User
+			err := json.NewDecoder(w.Body).Decode(&res)
+			if err != nil {
+				t.Errorf("Error decoding json response: %v", err.Error())
+			}
+
+			if res != test.expectedUser {
+				t.Errorf("Expected User %v, got %v", test.expectedUser, res)
+			}
+		})
+	}
+
+}
+
+// Helpers
+
+func getAuth(token models.UserToken) authMocks.AuthClient {
+	myMock := authMocks.AuthClient{}
+	myMock.On("UserTokenFromCtx", mock.Anything).Return(token)
+	return myMock
+}
+
+func testSuccess(status int) bool {
+	return status >= 200 && status < 300
 }

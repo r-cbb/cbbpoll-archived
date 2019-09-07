@@ -13,23 +13,24 @@ import (
 
 func (s *Server) Routes() {
 	s.router = mux.NewRouter()
+	v1 := s.router.PathPrefix("/v1").Subrouter()
+	s.v[1] = v1
 
 	// API Health & Version
-	s.router.HandleFunc("/", s.handlePing()).Methods(http.MethodGet)
-	s.router.HandleFunc("/ping", s.handlePing()).Methods(http.MethodGet)
+	v1.HandleFunc("/ping", s.handlePing()).Methods(http.MethodGet)
 
 	// Teams
-	s.router.HandleFunc("/teams", s.handleAddTeam()).Methods(http.MethodPost)
-	s.router.HandleFunc("/teams", s.handleListTeams()).Methods(http.MethodGet)
-	s.router.HandleFunc("/teams/{id:[0-9]+}", s.handleGetTeam()).Methods(http.MethodGet)
+	v1.HandleFunc("/teams", s.handleAddTeam()).Methods(http.MethodPost)
+	v1.HandleFunc("/teams", s.handleListTeams()).Methods(http.MethodGet)
+	v1.HandleFunc("/teams/{id:[0-9]+}", s.handleGetTeam()).Methods(http.MethodGet)
 
 	// Users
-	s.router.HandleFunc("/users/me", s.handleUsersMe()).Methods(http.MethodGet)
-	s.router.HandleFunc("/users/{name}", s.handleGetUser()).Methods(http.MethodGet)
+	v1.HandleFunc("/users/me", s.handleUsersMe()).Methods(http.MethodGet)
+	v1.HandleFunc("/users/{name}", s.handleGetUser()).Methods(http.MethodGet)
 }
 
 func (s *Server) AuthRoutes() {
-	newSession := s.router.HandleFunc("/sessions", s.handleNewSession()).Methods(http.MethodPost)
+	newSession := s.v[1].HandleFunc("/sessions", s.handleNewSession()).Methods(http.MethodPost)
 
 	s.router.Use(s.AuthClient.Verifier())
 	s.router.Use(SelectiveMiddleware(s.AuthClient.Authenticator, []*mux.Route{newSession}))
