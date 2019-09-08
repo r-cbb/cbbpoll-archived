@@ -57,6 +57,9 @@ func E(args ...interface{}) error {
 			e.Err = arg
 		case string:
 			e.Msg = arg
+		case nil:
+			// probably the result of calling E and passing in a nil error.
+			// Msg and Kind should provide context.
 		default:
 			panic("bad call to E")
 		}
