@@ -1,6 +1,7 @@
 package app
 
 import (
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -11,26 +12,26 @@ import (
 	"github.com/r-cbb/cbbpoll/internal/models"
 )
 
+const v1 = "/v1"
+
 func (s *Server) Routes() {
 	s.router = mux.NewRouter()
-	v1 := s.router.PathPrefix("/v1").Subrouter()
-	s.v[1] = v1
 
 	// API Health & Version
-	v1.HandleFunc("/ping", s.handlePing()).Methods(http.MethodGet)
+	s.router.HandleFunc(fmt.Sprintf("%s/ping", v1), s.handlePing()).Methods(http.MethodGet)
 
 	// Teams
-	v1.HandleFunc("/teams", s.handleAddTeam()).Methods(http.MethodPost)
-	v1.HandleFunc("/teams", s.handleListTeams()).Methods(http.MethodGet)
-	v1.HandleFunc("/teams/{id:[0-9]+}", s.handleGetTeam()).Methods(http.MethodGet)
+	s.router.HandleFunc(fmt.Sprintf("%s/teams", v1), s.handleAddTeam()).Methods(http.MethodPost)
+	s.router.HandleFunc(fmt.Sprintf("%s/teams", v1), s.handleListTeams()).Methods(http.MethodGet)
+	s.router.HandleFunc(fmt.Sprintf("%s/teams/{id:[0-9]+}", v1), s.handleGetTeam()).Methods(http.MethodGet).Name("team")
 
 	// Users
-	v1.HandleFunc("/users/me", s.handleUsersMe()).Methods(http.MethodGet)
-	v1.HandleFunc("/users/{name}", s.handleGetUser()).Methods(http.MethodGet)
+	s.router.HandleFunc(fmt.Sprintf("%s/users/me", v1), s.handleUsersMe()).Methods(http.MethodGet)
+	s.router.HandleFunc(fmt.Sprintf("%s/users/{name}", v1), s.handleGetUser()).Methods(http.MethodGet).Name("user")
 }
 
 func (s *Server) AuthRoutes() {
-	newSession := s.v[1].HandleFunc("/sessions", s.handleNewSession()).Methods(http.MethodPost)
+	newSession := s.router.HandleFunc(fmt.Sprintf("%s/sessions", v1), s.handleNewSession()).Methods(http.MethodPost)
 
 	s.router.Use(s.AuthClient.Verifier())
 	s.router.Use(SelectiveMiddleware(s.AuthClient.Authenticator, []*mux.Route{newSession}))
@@ -38,7 +39,10 @@ func (s *Server) AuthRoutes() {
 
 func (s *Server) handlePing() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		s.respond(w, r, struct{ Version string }{Version: s.version()}, http.StatusOK)
+		version := models.VersionInfo{
+			Version: s.version(),
+		}
+		s.respond(w, r, version, http.StatusOK)
 	}
 }
 
@@ -55,6 +59,7 @@ func (s *Server) handleAddTeam() http.HandlerFunc {
 
 		if errors.Kind(err) == errors.KindConcurrencyProblem {
 			// Retry once
+			fmt.Println("concurrency error, retrying once")
 			createdTeam, err = s.Db.AddTeam(newTeam)
 		}
 
@@ -63,7 +68,14 @@ func (s *Server) handleAddTeam() http.HandlerFunc {
 			return
 		}
 
-		s.respond(w, r, createdTeam, http.StatusOK)
+		teamURL, err := s.router.Get("team").URLPath("id", fmt.Sprintf("%d", createdTeam.ID))
+		if err != nil {
+			s.respond(w, r, nil, http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Location", fmt.Sprintf("%s%s", s.host, teamURL.String()))
+		s.respond(w, r, createdTeam, http.StatusCreated)
 		return
 	}
 }
@@ -175,14 +187,15 @@ func (s *Server) handleNewSession() http.HandlerFunc {
 
 		// Get user
 		var newUser bool
+		var createdUser models.User
 		user, err := s.Db.GetUser(name)
 		if errors.Kind(err) == errors.KindNotFound {
 			// TODO: fill in IsAdmin by comparing username to list stored locally, maybe in a file.
 			user = models.User{
 				Nickname: name,
-				IsAdmin: false,
+				IsAdmin:  false,
 			}
-			_, err := s.Db.AddUser(user)
+			createdUser, err = s.Db.AddUser(user)
 			if err != nil {
 				s.respond(w, r, nil, http.StatusInternalServerError)
 			}
@@ -196,8 +209,8 @@ func (s *Server) handleNewSession() http.HandlerFunc {
 		}
 
 		payload := struct {
-			Nickname string
-			Token string
+			Nickname string `json:"nickname"`
+			Token    string `json:"token"`
 		}{
 			Nickname: name,
 			Token:    token,
@@ -206,6 +219,14 @@ func (s *Server) handleNewSession() http.HandlerFunc {
 		var status = http.StatusOK
 		if newUser {
 			status = http.StatusCreated
+
+			url, err := s.router.Get("user").URLPath("name", createdUser.Nickname)
+			if err != nil {
+				s.respond(w, r, nil, http.StatusInternalServerError)
+				return
+			}
+
+			w.Header().Set("Location", fmt.Sprintf("%s%s", s.host, url))
 		}
 		s.respond(w, r, payload, status)
 	}

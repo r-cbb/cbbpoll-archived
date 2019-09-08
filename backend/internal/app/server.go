@@ -20,16 +20,18 @@ type Server struct {
 	AuthClient   auth.AuthClient
 	RedditClient RedditClient
 	router       *mux.Router
-	v            map[int]*mux.Router
+	host         string
 }
 
 func NewServer() *Server {
 	srv := Server{}
-	srv.v = make(map[int]*mux.Router)
-
 	srv.Routes()
 
 	return &srv
+}
+
+func (s *Server) SetHost(host string) {
+	s.host = host
 }
 
 func (s *Server) Handler() http.Handler {

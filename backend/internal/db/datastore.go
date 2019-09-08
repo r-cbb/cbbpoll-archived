@@ -105,6 +105,9 @@ func (db *DatastoreClient) AddTeam(team models.Team) (models.Team, error) {
 	// Perform a Get or Put to ensure atomicity
 	err = tx.Get(k, &tmp)
 	if err == nil || err != datastore.ErrNoSuchEntity {
+		if err == nil {
+			err = fmt.Errorf("Datastore 'Get or Put' failed")
+		}
 		_ = tx.Rollback()
 		return models.Team{}, errors.E(op, "concurrency error adding Team", errors.KindConcurrencyProblem, err)
 	}

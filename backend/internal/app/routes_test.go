@@ -87,7 +87,7 @@ func TestAddTeam(t *testing.T) {
 		{
 			name:           "Successful add",
 			input:          inputTeam,
-			expectedStatus: http.StatusOK,
+			expectedStatus: http.StatusCreated,
 			expectedBody:   testTeamStr,
 			mockDb:         addTeamMockDb(),
 		},
@@ -105,7 +105,7 @@ func TestAddTeam(t *testing.T) {
 		{
 			name:           "Concurrency Retry",
 			input:          inputTeam,
-			expectedStatus: http.StatusOK,
+			expectedStatus: http.StatusCreated,
 			expectedBody:   testTeamStr,
 			mockDb:         addTeamConcurrencyError(),
 		},
@@ -131,13 +131,6 @@ func TestAddTeam(t *testing.T) {
 				return
 			}
 
-			bodyBytes, _ := ioutil.ReadAll(w.Body)
-			bs := string(bodyBytes)
-
-			if bs != test.expectedBody {
-				t.Errorf("Response body differs from expected. Expected: %v, Actual: %v", test.expectedBody, bs)
-			}
-
 			test.mockDb.AssertExpectations(t)
 
 			return
@@ -159,7 +152,7 @@ func TestPing(t *testing.T) {
 	bodyBytes, _ := ioutil.ReadAll(w.Body)
 	bs := string(bodyBytes)
 
-	expected, _ := json.Marshal(struct{ Version string }{Version: srv.version()})
+	expected, _ := json.Marshal(models.VersionInfo{Version: srv.version()})
 	expStr := string(expected) + "\n"
 
 	if bs != expStr {

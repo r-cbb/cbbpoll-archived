@@ -37,7 +37,7 @@ func TestE(t *testing.T) {
 	}()
 
 	// should panic!
-	E(nil)
+	_ = E(t)
 }
 
 func TestKind(t *testing.T) {
