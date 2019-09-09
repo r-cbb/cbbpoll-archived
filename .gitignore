@@ -8,6 +8,7 @@ node_modules
 .env.local
 .env.*.local
 /backend/main
+/backend/coverage.out
 
 # Log files
 npm-debug.log*
