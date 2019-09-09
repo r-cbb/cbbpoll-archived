@@ -12,6 +12,7 @@ package docs
 //   500: unexpectedError
 //   503: serviceUnavailableError
 
+// Object containing the user's Nickname and a JWT for use in subsequent requests
 // swagger:response sessionResponse
 type sessionResponse struct {
 	// in: body
@@ -25,6 +26,7 @@ type sessionResponse struct {
 
 // swagger:parameters new-session
 type newSessionParameters struct {
+	// reddit access token provided in the Authorization header using the Bearer scheme.
 	// in: header
 	Authorization string
 }

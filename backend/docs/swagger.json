@@ -42,6 +42,7 @@
         "parameters": [
           {
             "type": "string",
+            "description": "reddit access token provided in the Authorization header using the Bearer scheme.",
             "name": "Authorization",
             "in": "header"
           }
@@ -89,6 +90,7 @@
         "operationId": "add-team",
         "parameters": [
           {
+            "description": "Team to be added.  id field will be ignored, if present.",
             "name": "Body",
             "in": "body",
             "schema": {
@@ -271,6 +273,7 @@
       "description": "Service unavailable."
     },
     "sessionResponse": {
+      "description": "Object containing the user's Nickname and a JWT for use in subsequent requests",
       "schema": {
         "type": "object",
         "properties": {
@@ -288,6 +291,7 @@
       }
     },
     "teamCreated": {
+      "description": "This response includes a JSON representation of the created Team in the response body and the URI for the team in the Location header",
       "schema": {
         "$ref": "#/definitions/Team"
       },
@@ -320,6 +324,7 @@
       "description": "Unexpected error."
     },
     "userResponse": {
+      "description": "The requested User object",
       "schema": {
         "$ref": "#/definitions/User"
       }

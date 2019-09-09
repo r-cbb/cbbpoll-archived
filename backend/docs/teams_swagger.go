@@ -38,6 +38,7 @@ type teamsResponseWrapper struct {
 //   400: badRequestError
 //   500: unexpectedError
 
+// This response includes a JSON representation of the created Team in the response body and the URI for the team in the Location header
 // swagger:response teamCreated
 type teamCreatedResponse struct {
 	// in: body
@@ -48,6 +49,7 @@ type teamCreatedResponse struct {
 
 // swagger:parameters add-team
 type addTeamsParameters struct {
+	// Team to be added.  id field will be ignored, if present.
 	// in: body
 	Body models.Team
 }

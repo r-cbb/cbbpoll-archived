@@ -11,6 +11,7 @@ import "github.com/r-cbb/cbbpoll/internal/models"
 //    401: unauthorizedError
 //    500: unexpectedError
 
+// The requested User object
 // swagger:response userResponse
 type userResponse struct {
 	// in: body
