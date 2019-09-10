@@ -7,6 +7,8 @@ node_modules
 # local env files
 .env.local
 .env.*.local
+/backend/main
+/backend/coverage.out
 
 # Log files
 npm-debug.log*
@@ -20,3 +22,7 @@ yarn-error.log*
 *.njsproj
 *.sln
 *.sw?
+
+# Secret files
+backend/*.key
+backend/*.pub

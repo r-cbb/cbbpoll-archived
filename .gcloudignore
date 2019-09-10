@@ -12,6 +12,7 @@
 # below:
 .git
 .gitignore
+frontend/*
 
 # Binaries for programs and plugins
 *.exe

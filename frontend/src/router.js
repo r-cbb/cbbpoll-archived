@@ -49,6 +49,20 @@ export default new Router({
       component: function () { 
         return import('./views/Overview.vue')
       }
+    },
+    {
+      path: '/admin',
+      name: 'admin',
+      component: function () { 
+        return import('./views/Admin.vue')
+      }
+    },
+    {
+      path: '/submitBallot',
+      name: 'submit',
+      component: function () { 
+        return import('./views/Submit.vue')
+      }
     }
   ]
 })

@@ -7,9 +7,6 @@
         </b-navbar-item>
       </template>
       <template slot="start">
-        <!-- <b-navbar-item tag="router-link" to="/results">
-         Results
-        </b-navbar-item> -->
         <b-dropdown hoverable aria-role="list">
           <a id="navDropdown" class="navbar-item" slot="trigger">
             <span>Results</span>
@@ -35,6 +32,12 @@
       </template>
 
       <template slot="end">
+        <b-navbar-item tag="router-link" to="/submitBallot">
+          Submit Ballot
+        </b-navbar-item>
+        <b-navbar-item tag="router-link" to="/admin">
+          <div>Admin</div>
+        </b-navbar-item>
         <b-navbar-item>
           <div class="green-text">Login/Sign Up</div>
         </b-navbar-item>
@@ -45,7 +48,12 @@
 
 <script>
 export default {
-  name: 'navbar'
+  name: 'navbar',
+  data() {
+    return {
+      admin: true
+    }
+  }
 }
 
 </script>

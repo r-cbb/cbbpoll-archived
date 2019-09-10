@@ -1,0 +1,36 @@
+# Golang CircleCI 2.0 configuration file
+#
+# Check https://circleci.com/docs/2.0/language-go/ for more details
+version: 2
+jobs:
+  build:
+    docker:
+      # specify the version
+      - image: circleci/golang:1.12
+
+      # Specify service dependencies here if necessary
+      # CircleCI maintains a library of pre-built images
+      # documented at https://circleci.com/docs/2.0/circleci-images/
+      # - image: circleci/postgres:9.4
+
+    working_directory: ~/cbbpoll
+    steps:
+      - checkout
+
+      # specify any bash command here prefixed with `run: `
+      - run:
+          name: get dependencies
+          command: go get -v -d ./...
+          working_directory: ~/cbbpoll/backend
+
+      - run:
+          name: run tests
+          command: |
+            go test -v -coverprofile=coverage.txt ./...
+            go tool cover -html=coverage.txt -o coverage.html
+            mv coverage.html /tmp/artifacts
+            bash <(curl -s https://codecov.io/bash)
+          working_directory: ~/cbbpoll/backend
+
+      - store_artifacts:
+          path: /tmp/artifacts
