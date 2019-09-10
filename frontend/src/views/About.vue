@@ -47,6 +47,9 @@
 </template>
 
 <script>
+	export default {
+  name: 'about'
+}
 </script>
 
 <style>
