@@ -1,5 +1,7 @@
 package models
 
+import "time"
+
 type VersionInfo struct {
 	// example: v1.0.0
 	Version string `json:"version"`
@@ -23,7 +25,39 @@ type User struct {
 	// required: true
 	Nickname string `json:"nickname"`
 	// example: true
-	IsAdmin bool `json:"is_admin"`
+	IsAdmin     bool         `json:"is_admin"`
+	VoterEvents []VoterEvent `json:"voter_events"`
+}
+
+type VoterEvent struct {
+	isVoter       bool
+	effectiveTime time.Time
+}
+
+type Poll struct {
+	// example: 2020
+	Season int `json:"season"`
+	// example: 3
+	Week      int       `json:"week"`
+	OpenTime  time.Time `json:"open_time"`
+	CloseTime time.Time `json:"close_time"`
+}
+
+type Ballot struct {
+	ID          int64
+	UpdatedTime time.Time
+	User        string
+	Votes       []Vote
+	Official    bool
+}
+
+type Vote struct {
+	// example: 1
+	TeamID uint64 `json:"team_id"`
+	// example: 1
+	Rank int `json:"rank"`
+	// example: Great away performances so far led by a strong senior class.
+	Reason string `json:"reason"`
 }
 
 /* Information stored in the jwt credentials for a user, allowing
@@ -38,7 +72,7 @@ type UserToken struct {
 	// example: Concision
 	Nickname string `json:"nickname"`
 	// example: true
-	IsAdmin  bool   `json:"is_admin"`
+	IsAdmin bool `json:"is_admin"`
 }
 
 func (u UserToken) LoggedIn() bool {

@@ -28,6 +28,11 @@ func (s *Server) Routes() {
 	// Users
 	s.router.HandleFunc(fmt.Sprintf("%s/users/me", v1), s.handleUsersMe()).Methods(http.MethodGet)
 	s.router.HandleFunc(fmt.Sprintf("%s/users/{name}", v1), s.handleGetUser()).Methods(http.MethodGet).Name("user")
+
+	// Polls
+	s.router.HandleFunc(fmt.Sprintf("%s/polls", v1), s.handleAddPoll()).Methods(http.MethodPost)
+	s.router.HandleFunc(fmt.Sprintf("%s/polls", v1), s.handleListPolls()).Methods(http.MethodGet)
+	s.router.HandleFunc(fmt.Sprintf("%s/polls/{year:[0-9]+}/{week:[0-9]+}", v1), s.handleGetPoll()).Methods(http.MethodGet)
 }
 
 func (s *Server) AuthRoutes() {
@@ -48,6 +53,12 @@ func (s *Server) handlePing() http.HandlerFunc {
 
 func (s *Server) handleAddTeam() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		token := s.AuthClient.UserTokenFromCtx(r.Context())
+		if !token.LoggedIn() {
+			s.respond(w, r, nil, http.StatusUnauthorized)
+		} else if !token.IsAdmin {
+			s.respond(w, r, nil, http.StatusForbidden)
+		}
 		var newTeam models.Team
 		err := s.decode(w, r, &newTeam)
 		if err != nil {
@@ -155,6 +166,24 @@ func (s *Server) handleGetUser() http.HandlerFunc {
 		}
 
 		s.respond(w, r, user, http.StatusOK)
+		return
+	}
+}
+
+func (s *Server) handleAddPoll() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		return
+	}
+}
+
+func (s *Server) handleListPolls() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		return
+	}
+}
+
+func (s *Server) handleGetPoll() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 }
