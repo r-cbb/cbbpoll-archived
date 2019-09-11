@@ -22,6 +22,7 @@ const (
 	KindJWTError
 	KindAuthError
 	KindServiceUnavailable
+	KindConflict
 )
 
 func (e Error) Error() string {

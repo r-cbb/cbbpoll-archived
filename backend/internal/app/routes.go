@@ -2,6 +2,7 @@ package app
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -26,13 +27,15 @@ func (s *Server) Routes() {
 	s.router.HandleFunc(fmt.Sprintf("%s/teams/{id:[0-9]+}", v1), s.handleGetTeam()).Methods(http.MethodGet).Name("team")
 
 	// Users
+	s.router.HandleFunc(fmt.Sprintf("%s/users", v1), s.handleAddUser()).Methods(http.MethodPost)
 	s.router.HandleFunc(fmt.Sprintf("%s/users/me", v1), s.handleUsersMe()).Methods(http.MethodGet)
 	s.router.HandleFunc(fmt.Sprintf("%s/users/{name}", v1), s.handleGetUser()).Methods(http.MethodGet).Name("user")
+	s.router.HandleFunc(fmt.Sprintf("%s/users/{name}", v1), s.handleUpdateUser()).Methods(http.MethodPut)
 
 	// Polls
 	s.router.HandleFunc(fmt.Sprintf("%s/polls", v1), s.handleAddPoll()).Methods(http.MethodPost)
 	s.router.HandleFunc(fmt.Sprintf("%s/polls", v1), s.handleListPolls()).Methods(http.MethodGet)
-	s.router.HandleFunc(fmt.Sprintf("%s/polls/{year:[0-9]+}/{week:[0-9]+}", v1), s.handleGetPoll()).Methods(http.MethodGet)
+	s.router.HandleFunc(fmt.Sprintf("%s/polls/{season:[0-9]+}/{week:[0-9]+}", v1), s.handleGetPoll()).Methods(http.MethodGet).Name("poll')")
 }
 
 func (s *Server) AuthRoutes() {
@@ -48,6 +51,7 @@ func (s *Server) handlePing() http.HandlerFunc {
 			Version: s.version(),
 		}
 		s.respond(w, r, version, http.StatusOK)
+		return
 	}
 }
 
@@ -56,8 +60,10 @@ func (s *Server) handleAddTeam() http.HandlerFunc {
 		token := s.AuthClient.UserTokenFromCtx(r.Context())
 		if !token.LoggedIn() {
 			s.respond(w, r, nil, http.StatusUnauthorized)
+			return
 		} else if !token.IsAdmin {
 			s.respond(w, r, nil, http.StatusForbidden)
+			return
 		}
 		var newTeam models.Team
 		err := s.decode(w, r, &newTeam)
@@ -126,6 +132,50 @@ func (s *Server) handleListTeams() http.HandlerFunc {
 		}
 
 		s.respond(w, r, teams, http.StatusOK)
+		return
+	}
+}
+
+func (s *Server) handleAddUser() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		token := s.AuthClient.UserTokenFromCtx(r.Context())
+
+		if !token.LoggedIn() {
+			s.respond(w, r, nil, http.StatusUnauthorized)
+			return
+		}
+
+		if !token.IsAdmin {
+			s.respond(w, r, nil, http.StatusForbidden)
+			return
+		}
+
+		var user models.User
+		err := s.decode(w, r, &user)
+		if err != nil {
+			s.respond(w, r, nil, http.StatusBadRequest)
+			return
+		}
+
+		user, err = s.Db.AddUser(user)
+		if err != nil {
+			if errors.Kind(err) == errors.KindConflict {
+				s.respond(w, r, nil, http.StatusConflict)
+				return
+			}
+			s.respond(w, r, nil, http.StatusInternalServerError)
+			return
+		}
+
+		url, err := s.router.Get("user").URLPath("name", user.Nickname)
+		if err != nil {
+			s.respond(w, r, nil, http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Location", fmt.Sprintf("%s%s", s.host, url))
+
+		s.respond(w, r, nil, http.StatusCreated)
+		return
 	}
 }
 
@@ -170,9 +220,93 @@ func (s *Server) handleGetUser() http.HandlerFunc {
 	}
 }
 
+func (s *Server) handleUpdateUser() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		token := s.AuthClient.UserTokenFromCtx(r.Context())
+		vars := mux.Vars(r)
+		name := vars["name"]
+
+		var user models.User
+		err := s.decode(w, r, &user)
+		if err != nil {
+			s.respond(w, r, nil, http.StatusBadRequest)
+			return
+		}
+
+		if !token.LoggedIn() {
+			s.respond(w, r, nil, http.StatusUnauthorized)
+			return
+		}
+
+		if token.Nickname != name && !token.IsAdmin {
+			s.respond(w, r, nil, http.StatusForbidden)
+			return
+		}
+
+		existingUser, err := s.Db.GetUser(name)
+		if err != nil {
+			if errors.Kind(err) == errors.KindNotFound {
+				s.respond(w, r, nil, http.StatusNotFound)
+				return
+			}
+			s.respond(w, r, nil, http.StatusInternalServerError)
+			return
+		}
+
+		if existingUser.IsVoter != user.IsVoter && !token.IsAdmin {
+			s.respond(w, r, nil, http.StatusForbidden)
+			return
+		}
+
+		if existingUser.IsAdmin != user.IsAdmin && !token.IsAdmin {
+			s.respond(w, r, nil, http.StatusForbidden)
+			return
+		}
+
+		err = s.Db.UpdateUser(user)
+		if err != nil {
+			log.Println(err.Error())
+			switch errors.Kind(err) {
+			case errors.KindNotFound:
+				s.respond(w, r, nil, http.StatusNotFound)
+				return
+			default:
+				s.respond(w, r, nil, http.StatusInternalServerError)
+				return
+			}
+		}
+
+		s.respond(w, r, nil, http.StatusOK)
+		return
+	}
+}
+
 func (s *Server) handleAddPoll() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		return
+		token := s.AuthClient.UserTokenFromCtx(r.Context())
+
+		if !token.LoggedIn() {
+			s.respond(w, r, nil, http.StatusUnauthorized)
+			return
+		}
+
+		if !token.IsAdmin {
+			s.respond(w, r, nil, http.StatusForbidden)
+			return
+		}
+
+		var poll models.Poll
+		err := s.decode(w, r, &poll)
+		if err != nil {
+			s.respond(w, r, nil, http.StatusBadRequest)
+			return
+		}
+
+		_, err = s.Db.AddPoll(poll)
+		if err != nil {
+			s.respond(w, r, nil, http.StatusInternalServerError)
+			return
+		}
 	}
 }
 
@@ -184,6 +318,28 @@ func (s *Server) handleListPolls() http.HandlerFunc {
 
 func (s *Server) handleGetPoll() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		vars := mux.Vars(r)
+		season, err := strconv.Atoi(vars["season"])
+		if err != nil {
+			s.respond(w, r, nil, http.StatusBadRequest)
+		}
+		week, err := strconv.Atoi(vars["week"])
+		if err != nil {
+			s.respond(w, r, nil, http.StatusBadRequest)
+		}
+
+		poll, err := s.Db.GetPoll(season, week)
+		if err != nil {
+			if errors.Kind(err) == errors.KindNotFound {
+				s.respond(w, r, nil, http.StatusNotFound)
+				return
+			}
+
+			s.respond(w, r, nil, http.StatusInternalServerError)
+			return
+		}
+
+		s.respond(w, r, poll, http.StatusOK)
 		return
 	}
 }
@@ -227,6 +383,7 @@ func (s *Server) handleNewSession() http.HandlerFunc {
 			createdUser, err = s.Db.AddUser(user)
 			if err != nil {
 				s.respond(w, r, nil, http.StatusInternalServerError)
+				return
 			}
 			newUser = true
 		}
@@ -258,5 +415,6 @@ func (s *Server) handleNewSession() http.HandlerFunc {
 			w.Header().Set("Location", fmt.Sprintf("%s%s", s.host, url))
 		}
 		s.respond(w, r, payload, status)
+		return
 	}
 }

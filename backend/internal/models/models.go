@@ -24,14 +24,16 @@ type User struct {
 	// example: Concision
 	// required: true
 	Nickname string `json:"nickname"`
+	// example: false
+	IsAdmin bool `json:"is_admin"`
 	// example: true
-	IsAdmin     bool         `json:"is_admin"`
-	VoterEvents []VoterEvent `json:"voter_events"`
+	IsVoter     bool         `json:"is_voter"`
+	VoterEvents []VoterEvent `json:"-"`
 }
 
 type VoterEvent struct {
-	isVoter       bool
-	effectiveTime time.Time
+	IsVoter       bool
+	EffectiveTime time.Time
 }
 
 type Poll struct {
@@ -44,11 +46,11 @@ type Poll struct {
 }
 
 type Ballot struct {
-	ID          int64
-	UpdatedTime time.Time
-	User        string
-	Votes       []Vote
-	Official    bool
+	ID          int64 `json:"id"`
+	UpdatedTime time.Time `json:"updated_time"`
+	User        string `json:"user"`
+	Votes       []Vote `json:"votes"`
+	IsOfficial    bool `json:"is_official"`
 }
 
 type Vote struct {

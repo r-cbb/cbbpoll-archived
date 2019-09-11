@@ -59,7 +59,7 @@ func main() {
 
 	handler := c.Handler(server)
 
-	// TODO: flag to enable TLS
+	// TODO: flag to enable TLS?
 	srv := &http.Server{
 		Handler: handler,
 		Addr:    fmt.Sprintf(":%s", port),

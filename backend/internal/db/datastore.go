@@ -3,6 +3,7 @@ package db
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"cloud.google.com/go/datastore"
 
@@ -193,7 +194,9 @@ func (db *DatastoreClient) AddUser(user models.User) (models.User, error) {
 
 	// Perform a Get or Put to ensure atomicity
 	err = db.client.Get(ctx, k, &tmp)
-	if err == nil || err != datastore.ErrNoSuchEntity {
+	if err == nil {
+		return models.User{}, errors.E(op, "user already exists", errors.KindConflict, err)
+	} else if err != datastore.ErrNoSuchEntity {
 		_ = tx.Rollback()
 		return models.User{}, errors.E(op, "concurrency error adding User", errors.KindConcurrencyProblem, err)
 	}
@@ -215,4 +218,83 @@ func (db *DatastoreClient) AddUser(user models.User) (models.User, error) {
 	}
 
 	return user, nil
+}
+
+func (db *DatastoreClient) UpdateUser(user models.User) error {
+	const op errors.Op = "datastore.UpdateUser"
+	ctx := context.Background()
+
+	tx, err := db.client.NewTransaction(ctx)
+	if err != nil {
+		return errors.E(op, "could not create transaction", errors.KindDatabaseError, err)
+	}
+
+	var oldUser models.User
+	k := datastore.NameKey("User", user.Nickname, nil)
+	err = tx.Get(k, &oldUser)
+	if err != nil {
+		return errors.E(op, "user not found to update", errors.KindNotFound, err)
+	}
+
+	user.VoterEvents = oldUser.VoterEvents
+	if user.IsVoter != oldUser.IsVoter {
+		user.VoterEvents = append([]models.VoterEvent{{user.IsVoter, time.Now()}}, oldUser.VoterEvents...)
+	}
+
+	_, err = tx.Put(k, &user)
+	if err != nil {
+		return errors.E(op, "error updating user", errors.KindDatabaseError, err)
+	}
+
+	_, err = tx.Commit()
+	if err != nil {
+		return errors.E(op, "error committing transaction", errors.KindConcurrencyProblem, err)
+	}
+
+	return nil
+}
+
+func (db *DatastoreClient) AddPoll(newPoll models.Poll) (poll models.Poll, err error) {
+	const op errors.Op = "datastore.AddPoll"
+	ctx := context.Background()
+
+	k := datastore.IncompleteKey("Poll", nil)
+
+	_, err = db.client.Put(ctx, k, &newPoll)
+	if err != nil {
+		return models.Poll{}, errors.E(op, "error on Put operation for Poll", errors.KindDatabaseError, err)
+	}
+
+	return poll, nil
+}
+
+func (db *DatastoreClient) GetPoll(season int, week int) (poll models.Poll, err error) {
+	const op errors.Op = "datastore.GetPoll"
+	ctx := context.Background()
+
+	q := datastore.NewQuery("Poll").Filter("Season =", season).Filter("Week =", week)
+
+	var polls []models.Poll
+	_, err = db.client.GetAll(ctx, q, &polls)
+	if err != nil {
+		return models.Poll{}, errors.E(op, "error on Get operation for Poll", errors.KindDatabaseError, err)
+	}
+
+	if len(polls) > 1 {
+		return models.Poll{}, errors.E(op, fmt.Sprintf("more than one poll found for season %v, week %v\n", season, week), errors.KindConflict)
+	}
+
+	if len(polls) == 0 {
+		return models.Poll{}, errors.E(op, "poll not found", errors.KindNotFound)
+	}
+
+	return polls[0], nil
+}
+
+func (db *DatastoreClient) AddBallot(newBallot models.Ballot) (ballot models.Ballot, err error) {
+	panic("implement me")
+}
+
+func (db *DatastoreClient) GetBallot(id int64) (ballot models.Ballot, err error) {
+	panic("implement me")
 }
