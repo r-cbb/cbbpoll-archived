@@ -28,7 +28,7 @@ type User struct {
 	IsAdmin bool `json:"is_admin"`
 	// example: true
 	IsVoter     bool         `json:"is_voter"`
-	VoterEvents []VoterEvent `json:"-"`
+	VoterEvents []VoterEvent `json:"voter_events,omitempty"`
 }
 
 type VoterEvent struct {
@@ -41,16 +41,18 @@ type Poll struct {
 	Season int `json:"season"`
 	// example: 3
 	Week      int       `json:"week"`
+	// description: used to "pretty up" polls like Preseason, Postseason, "Way-too-early", etc.  Empty otherwise.
+	WeekName  string    `json:"week_name,omitempty"`
 	OpenTime  time.Time `json:"open_time"`
 	CloseTime time.Time `json:"close_time"`
 }
 
 type Ballot struct {
-	ID          int64 `json:"id"`
+	ID          int64     `json:"id"`
 	UpdatedTime time.Time `json:"updated_time"`
-	User        string `json:"user"`
-	Votes       []Vote `json:"votes"`
-	IsOfficial    bool `json:"is_official"`
+	User        string    `json:"user"`
+	Votes       []Vote    `json:"votes"`
+	IsOfficial  bool      `json:"is_official"`
 }
 
 type Vote struct {
@@ -59,7 +61,7 @@ type Vote struct {
 	// example: 1
 	Rank int `json:"rank"`
 	// example: Great away performances so far led by a strong senior class.
-	Reason string `json:"reason"`
+	Reason string `json:"reason,omitempty"`
 }
 
 /* Information stored in the jwt credentials for a user, allowing

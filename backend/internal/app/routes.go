@@ -2,12 +2,11 @@ package app
 
 import (
 	"fmt"
+	"github.com/gorilla/mux"
 	"log"
 	"net/http"
 	"strconv"
 	"strings"
-
-	"github.com/gorilla/mux"
 
 	"github.com/r-cbb/cbbpoll/internal/errors"
 	"github.com/r-cbb/cbbpoll/internal/models"
@@ -17,7 +16,6 @@ const v1 = "/v1"
 
 func (s *Server) Routes() {
 	s.router = mux.NewRouter()
-
 	// API Health & Version
 	s.router.HandleFunc(fmt.Sprintf("%s/ping", v1), s.handlePing()).Methods(http.MethodGet)
 
@@ -35,7 +33,13 @@ func (s *Server) Routes() {
 	// Polls
 	s.router.HandleFunc(fmt.Sprintf("%s/polls", v1), s.handleAddPoll()).Methods(http.MethodPost)
 	s.router.HandleFunc(fmt.Sprintf("%s/polls", v1), s.handleListPolls()).Methods(http.MethodGet)
-	s.router.HandleFunc(fmt.Sprintf("%s/polls/{season:[0-9]+}/{week:[0-9]+}", v1), s.handleGetPoll()).Methods(http.MethodGet).Name("poll')")
+	s.router.HandleFunc(fmt.Sprintf("%s/polls/{season:[0-9]+}/{week:[0-9]+}", v1), s.handleGetPoll()).Methods(http.MethodGet).Name("poll")
+
+	// Ballots
+	s.router.HandleFunc(fmt.Sprintf("%s/ballots", v1), s.handleAddBallot()).Methods(http.MethodPost)
+	s.router.HandleFunc(fmt.Sprintf("%s/ballots", v1), s.handleListBallots()).Methods(http.MethodGet)
+	s.router.HandleFunc(fmt.Sprintf("%s/ballots/{id:[0-9]+}", v1), s.handleEditBallot()).Methods(http.MethodPut)
+	s.router.HandleFunc(fmt.Sprintf("%s/ballots/{id:[0-9]+}", v1), s.handleGetBallot()).Methods(http.MethodGet)
 }
 
 func (s *Server) AuthRoutes() {
@@ -340,6 +344,30 @@ func (s *Server) handleGetPoll() http.HandlerFunc {
 		}
 
 		s.respond(w, r, poll, http.StatusOK)
+		return
+	}
+}
+
+func (s *Server) handleAddBallot() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+
+	}
+}
+
+func (s *Server) handleGetBallot() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		return
+	}
+}
+
+func (s *Server) handleListBallots() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		return
+	}
+}
+
+func (s *Server) handleEditBallot() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 }
