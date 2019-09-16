@@ -1,4 +1,4 @@
-package app
+package server
 
 import (
 	"encoding/json"
@@ -7,16 +7,17 @@ import (
 	"net/http"
 
 	"github.com/gorilla/mux"
+
+	"github.com/r-cbb/cbbpoll/internal/app"
 	"github.com/r-cbb/cbbpoll/internal/auth"
-	"github.com/r-cbb/cbbpoll/internal/db"
 	"github.com/r-cbb/cbbpoll/internal/errors"
 )
 
 /*
-Server is a type that holds state for the app, along with routers and handlers.
+Server is a type that holds state for the server, along with routers and handlers.
 */
 type Server struct {
-	Db           db.DBClient
+	App          *app.PollService
 	AuthClient   auth.AuthClient
 	RedditClient RedditClient
 	router       *mux.Router

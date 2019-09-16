@@ -8,6 +8,7 @@ import (
 
 	"github.com/dgrijalva/jwt-go"
 	"github.com/go-chi/jwtauth"
+
 	"github.com/r-cbb/cbbpoll/internal/errors"
 	"github.com/r-cbb/cbbpoll/internal/models"
 )
@@ -24,7 +25,7 @@ type JwtClient struct {
 }
 
 func InitJwtAuth(secretReader, publicReader io.Reader) (*JwtClient, error) {
-	var op errors.Op = "auth.InitJwtAuth"
+	const op errors.Op = "auth.InitJwtAuth"
 	keytext, err := ioutil.ReadAll(secretReader)
 	if err != nil {
 		return nil, errors.E(op, errors.KindJWTError, err, "error reading secret key")
