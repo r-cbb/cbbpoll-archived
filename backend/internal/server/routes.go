@@ -1,12 +1,13 @@
-package app
+package server
 
 import (
 	"fmt"
-	"github.com/gorilla/mux"
 	"log"
 	"net/http"
 	"strconv"
 	"strings"
+
+	"github.com/gorilla/mux"
 
 	"github.com/r-cbb/cbbpoll/internal/errors"
 	"github.com/r-cbb/cbbpoll/internal/models"
@@ -62,13 +63,7 @@ func (s *Server) handlePing() http.HandlerFunc {
 func (s *Server) handleAddTeam() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		token := s.AuthClient.UserTokenFromCtx(r.Context())
-		if !token.LoggedIn() {
-			s.respond(w, r, nil, http.StatusUnauthorized)
-			return
-		} else if !token.IsAdmin {
-			s.respond(w, r, nil, http.StatusForbidden)
-			return
-		}
+
 		var newTeam models.Team
 		err := s.decode(w, r, &newTeam)
 		if err != nil {
@@ -76,26 +71,29 @@ func (s *Server) handleAddTeam() http.HandlerFunc {
 			return
 		}
 
-		createdTeam, err := s.Db.AddTeam(newTeam)
-
-		if errors.Kind(err) == errors.KindConcurrencyProblem {
-			// Retry once
-			fmt.Println("concurrency error, retrying once")
-			createdTeam, err = s.Db.AddTeam(newTeam)
-		}
+		createdTeam, err := s.App.AddTeam(token, newTeam)
 
 		if err != nil {
-			s.respond(w, r, nil, http.StatusInternalServerError)
-			return
+			switch errors.Kind(err) {
+			case errors.KindUnauthenticated:
+				s.respond(w, r, nil, http.StatusUnauthorized)
+				return
+			case errors.KindUnauthorized:
+				s.respond(w, r, nil, http.StatusForbidden)
+				return
+			default:
+				s.respond(w, r, nil, http.StatusInternalServerError)
+				return
+			}
 		}
 
 		teamURL, err := s.router.Get("team").URLPath("id", fmt.Sprintf("%d", createdTeam.ID))
 		if err != nil {
-			s.respond(w, r, nil, http.StatusInternalServerError)
-			return
+			log.Println("Unable to get url for created team")
+		} else {
+			w.Header().Set("Location", fmt.Sprintf("%s%s", s.host, teamURL.String()))
 		}
 
-		w.Header().Set("Location", fmt.Sprintf("%s%s", s.host, teamURL.String()))
 		s.respond(w, r, createdTeam, http.StatusCreated)
 		return
 	}
@@ -111,7 +109,8 @@ func (s *Server) handleGetTeam() http.HandlerFunc {
 			return
 		}
 
-		team, err := s.Db.GetTeam(intId)
+		team, err := s.App.GetTeam(intId)
+
 		if err != nil {
 			if errors.Kind(err) == errors.KindNotFound {
 				s.respond(w, r, nil, http.StatusNotFound)
@@ -129,7 +128,8 @@ func (s *Server) handleGetTeam() http.HandlerFunc {
 
 func (s *Server) handleListTeams() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		teams, err := s.Db.GetTeams()
+		teams, err := s.App.AllTeams()
+
 		if err != nil {
 			s.respond(w, r, nil, http.StatusInternalServerError)
 			return
@@ -144,41 +144,39 @@ func (s *Server) handleAddUser() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		token := s.AuthClient.UserTokenFromCtx(r.Context())
 
-		if !token.LoggedIn() {
-			s.respond(w, r, nil, http.StatusUnauthorized)
-			return
-		}
-
-		if !token.IsAdmin {
-			s.respond(w, r, nil, http.StatusForbidden)
-			return
-		}
-
 		var user models.User
 		err := s.decode(w, r, &user)
 		if err != nil {
 			s.respond(w, r, nil, http.StatusBadRequest)
 			return
 		}
+		createdUser, err := s.App.AddUser(token, user)
 
-		user, err = s.Db.AddUser(user)
 		if err != nil {
-			if errors.Kind(err) == errors.KindConflict {
+			switch errors.Kind(err) {
+			case errors.KindUnauthenticated:
+				s.respond(w, r, nil, http.StatusUnauthorized)
+				return
+			case errors.KindUnauthorized:
+				s.respond(w, r, nil, http.StatusForbidden)
+				return
+			case errors.KindConflict:
 				s.respond(w, r, nil, http.StatusConflict)
 				return
+			default:
+				s.respond(w, r, nil, http.StatusInternalServerError)
+				return
 			}
-			s.respond(w, r, nil, http.StatusInternalServerError)
-			return
 		}
 
-		url, err := s.router.Get("user").URLPath("name", user.Nickname)
+		url, err := s.router.Get("user").URLPath("name", createdUser.Nickname)
 		if err != nil {
-			s.respond(w, r, nil, http.StatusInternalServerError)
-			return
+			log.Println("Error retrieving url for created user")
+		} else {
+			w.Header().Set("Location", fmt.Sprintf("%s%s", s.host, url))
 		}
-		w.Header().Set("Location", fmt.Sprintf("%s%s", s.host, url))
 
-		s.respond(w, r, nil, http.StatusCreated)
+		s.respond(w, r, createdUser, http.StatusCreated)
 		return
 	}
 }
@@ -192,7 +190,7 @@ func (s *Server) handleUsersMe() http.HandlerFunc {
 			return
 		}
 
-		user, err := s.Db.GetUser(token.Nickname)
+		user, err := s.App.GetUser(token.Nickname)
 		if err != nil {
 			s.respond(w, r, nil, http.StatusInternalServerError)
 			return
@@ -208,7 +206,7 @@ func (s *Server) handleGetUser() http.HandlerFunc {
 		vars := mux.Vars(r)
 		name := vars["name"]
 
-		user, err := s.Db.GetUser(name)
+		user, err := s.App.GetUser(name)
 		if err != nil {
 			if errors.Kind(err) == errors.KindNotFound {
 				s.respond(w, r, nil, http.StatusNotFound)
@@ -237,50 +235,25 @@ func (s *Server) handleUpdateUser() http.HandlerFunc {
 			return
 		}
 
-		if !token.LoggedIn() {
-			s.respond(w, r, nil, http.StatusUnauthorized)
-			return
-		}
-
-		if token.Nickname != name && !token.IsAdmin {
-			s.respond(w, r, nil, http.StatusForbidden)
-			return
-		}
-
-		existingUser, err := s.Db.GetUser(name)
+		updatedUser, err := s.App.UpdateUser(token, name, user)
 		if err != nil {
-			if errors.Kind(err) == errors.KindNotFound {
-				s.respond(w, r, nil, http.StatusNotFound)
-				return
-			}
-			s.respond(w, r, nil, http.StatusInternalServerError)
-			return
-		}
-
-		if existingUser.IsVoter != user.IsVoter && !token.IsAdmin {
-			s.respond(w, r, nil, http.StatusForbidden)
-			return
-		}
-
-		if existingUser.IsAdmin != user.IsAdmin && !token.IsAdmin {
-			s.respond(w, r, nil, http.StatusForbidden)
-			return
-		}
-
-		err = s.Db.UpdateUser(user)
-		if err != nil {
-			log.Println(err.Error())
 			switch errors.Kind(err) {
+			case errors.KindUnauthenticated:
+				s.respond(w, r, nil, http.StatusUnauthorized)
+				return
+			case errors.KindUnauthorized:
+				s.respond(w, r, nil, http.StatusForbidden)
+				return
 			case errors.KindNotFound:
 				s.respond(w, r, nil, http.StatusNotFound)
 				return
-			default:
-				s.respond(w, r, nil, http.StatusInternalServerError)
+			case errors.KindBadRequest:
+				s.respond(w, r, nil, http.StatusBadRequest)
 				return
 			}
 		}
 
-		s.respond(w, r, nil, http.StatusOK)
+		s.respond(w, r, updatedUser, http.StatusOK)
 		return
 	}
 }
@@ -289,16 +262,6 @@ func (s *Server) handleAddPoll() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		token := s.AuthClient.UserTokenFromCtx(r.Context())
 
-		if !token.LoggedIn() {
-			s.respond(w, r, nil, http.StatusUnauthorized)
-			return
-		}
-
-		if !token.IsAdmin {
-			s.respond(w, r, nil, http.StatusForbidden)
-			return
-		}
-
 		var poll models.Poll
 		err := s.decode(w, r, &poll)
 		if err != nil {
@@ -306,16 +269,30 @@ func (s *Server) handleAddPoll() http.HandlerFunc {
 			return
 		}
 
-		_, err = s.Db.AddPoll(poll)
+		newPoll, err := s.App.AddPoll(token, poll)
+
 		if err != nil {
 			s.respond(w, r, nil, http.StatusInternalServerError)
 			return
 		}
+
+		url, err := s.router.Get("poll").URLPath(
+			"season", strconv.FormatInt(int64(newPoll.Season), 10),
+			"week", strconv.FormatInt(int64(newPoll.Week), 10))
+		if err != nil {
+			log.Println(fmt.Sprintf("Error retrieving url for created poll: %s", err.Error()))
+		} else {
+			w.Header().Set("Location", fmt.Sprintf("%s%s", s.host, url))
+		}
+
+		s.respond(w, r, newPoll, http.StatusCreated)
+		return
 	}
 }
 
 func (s *Server) handleListPolls() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		log.Println("handleListPolls not implemented")
 		return
 	}
 }
@@ -332,7 +309,7 @@ func (s *Server) handleGetPoll() http.HandlerFunc {
 			s.respond(w, r, nil, http.StatusBadRequest)
 		}
 
-		poll, err := s.Db.GetPoll(season, week)
+		poll, err := s.App.GetPoll(season, week)
 		if err != nil {
 			if errors.Kind(err) == errors.KindNotFound {
 				s.respond(w, r, nil, http.StatusNotFound)
@@ -401,14 +378,14 @@ func (s *Server) handleNewSession() http.HandlerFunc {
 		// Get user
 		var newUser bool
 		var createdUser models.User
-		user, err := s.Db.GetUser(name)
+		user, err := s.App.GetUser(name)
 		if errors.Kind(err) == errors.KindNotFound {
 			// TODO: fill in IsAdmin by comparing username to list stored locally, maybe in a file.
 			user = models.User{
 				Nickname: name,
 				IsAdmin:  false,
 			}
-			createdUser, err = s.Db.AddUser(user)
+			createdUser, err = s.App.NewUser(user)
 			if err != nil {
 				s.respond(w, r, nil, http.StatusInternalServerError)
 				return

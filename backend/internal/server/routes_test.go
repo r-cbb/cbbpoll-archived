@@ -1,4 +1,4 @@
-package app
+package server
 
 import (
 	"bytes"
@@ -12,6 +12,7 @@ import (
 
 	"github.com/stretchr/testify/mock"
 
+	"github.com/r-cbb/cbbpoll/internal/app"
 	authMocks "github.com/r-cbb/cbbpoll/internal/auth/mocks"
 	"github.com/r-cbb/cbbpoll/internal/db/mocks"
 	"github.com/r-cbb/cbbpoll/internal/errors"
@@ -47,8 +48,9 @@ var testAdmin = models.User{
 }
 
 var testUser = models.User{
-	Nickname: "JohnDoe",
-	IsAdmin:  false,
+	Nickname:    "JohnDoe",
+	IsAdmin:     false,
+	VoterEvents: nil,
 }
 
 func addTeamMockDb() mocks.DBClient {
@@ -71,11 +73,10 @@ func addTeamConcurrencyError() mocks.DBClient {
 }
 
 func TestAddTeam(t *testing.T) {
-	testTeamJson, err := json.Marshal(testArizona)
-	if err != nil {
-		panic("Couldn't marshal inputTeam")
+	adminToken := models.UserToken{
+		Nickname: "Concision",
+		IsAdmin:  true,
 	}
-	testTeamStr := string(testTeamJson) + "\n"
 
 	tests := []struct {
 		name           string
@@ -83,38 +84,43 @@ func TestAddTeam(t *testing.T) {
 		expectedStatus int
 		expectedBody   string
 		mockDb         mocks.DBClient
+		authClient     authMocks.AuthClient
 	}{
 		{
 			name:           "Successful add",
 			input:          inputTeam,
 			expectedStatus: http.StatusCreated,
-			expectedBody:   testTeamStr,
 			mockDb:         addTeamMockDb(),
+			authClient:     getAuth(adminToken),
 		},
 		{
 			name:           "Bad input",
 			input:          "{{{{foo%%",
 			expectedStatus: http.StatusBadRequest,
+			authClient:     getAuth(adminToken),
 		},
 		{
 			name:           "Database error",
 			input:          inputTeam,
 			expectedStatus: http.StatusInternalServerError,
 			mockDb:         addTeamDbError(),
+			authClient:     getAuth(adminToken),
 		},
 		{
 			name:           "Concurrency Retry",
 			input:          inputTeam,
 			expectedStatus: http.StatusCreated,
-			expectedBody:   testTeamStr,
 			mockDb:         addTeamConcurrencyError(),
+			authClient:     getAuth(adminToken),
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			srv := NewServer()
-			srv.Db = &test.mockDb
+			db := &test.mockDb
+			srv.App = app.NewPollService(db)
+			srv.AuthClient = &test.authClient
 
 			var buf bytes.Buffer
 			err := json.NewEncoder(&buf).Encode(test.input)
@@ -195,7 +201,8 @@ func TestGetMe(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			srv := NewServer()
-			srv.Db = &test.mockDb
+			db := &test.mockDb
+			srv.App = app.NewPollService(db)
 			srv.AuthClient = &test.authClient
 
 			r := httptest.NewRequest(http.MethodGet, "/v1/users/me", nil)
@@ -241,7 +248,8 @@ func TestGetTeam(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			srv := NewServer()
-			srv.Db = &test.mockDb
+			db := &test.mockDb
+			srv.App = app.NewPollService(db)
 
 			r := httptest.NewRequest(http.MethodGet, "/v1/teams/1", nil)
 			w := httptest.NewRecorder()
@@ -308,7 +316,8 @@ func TestListTeams(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			srv := NewServer()
-			srv.Db = &test.mockDb
+			db := &test.mockDb
+			srv.App = app.NewPollService(db)
 
 			r := httptest.NewRequest(http.MethodGet, "/v1/teams", nil)
 			w := httptest.NewRecorder()
@@ -368,7 +377,8 @@ func TestGetUser(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			srv := NewServer()
-			srv.Db = &test.mockDb
+			db := &test.mockDb
+			srv.App = app.NewPollService(db)
 
 			r := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/v1/users/%s", testUser.Nickname), nil)
 			w := httptest.NewRecorder()
@@ -387,7 +397,7 @@ func TestGetUser(t *testing.T) {
 				t.Errorf("Error decoding json response: %v", err.Error())
 			}
 
-			if res != test.expectedUser {
+			if !reflect.DeepEqual(res, test.expectedUser) {
 				t.Errorf("Expected User %v, got %v", test.expectedUser, res)
 			}
 		})
@@ -488,7 +498,8 @@ func TestNewSession(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			srv := NewServer()
-			srv.Db = &test.mockDb
+			db := &test.mockDb
+			srv.App = app.NewPollService(db)
 			srv.RedditClient = test.redditClient
 			srv.AuthClient = &test.mockAuth
 			srv.AuthRoutes()

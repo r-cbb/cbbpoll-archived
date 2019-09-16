@@ -13,26 +13,29 @@ import (
 	"github.com/r-cbb/cbbpoll/internal/app"
 	"github.com/r-cbb/cbbpoll/internal/auth"
 	"github.com/r-cbb/cbbpoll/internal/db"
+	"github.com/r-cbb/cbbpoll/internal/server"
 )
 
 func main() {
 	log.SetOutput(os.Stdout)
 	log.Println("Initializing server...")
 
-	server := app.NewServer()
+	srv := server.NewServer()
 	var err error
 
 	// Setup Datastore connection
-	server.Db, err = db.NewDatastoreClient("cbbpoll")
-
-	log.Println("\tDatastoreClient initialized")
+	db, err := db.NewDatastoreClient("cbbpoll")
 	if err != nil {
 		log.Fatal(err.Error())
 		panic(err.Error())
 	}
+	log.Println("\tDatastoreClient initialized")
+
+	// Setup service layer
+	srv.App = app.NewPollService(db)
 
 	// Setup JWT Auth
-	setupAuth(server)
+	setupAuth(srv)
 
 	// Setup HTTP Server
 	port := os.Getenv("PORT")
@@ -45,7 +48,7 @@ func main() {
 
 	// Setup reddit client
 	// TODO read from config
-	server.RedditClient = app.NewRedditClient("https://oauth.reddit.com/api/v1")
+	srv.RedditClient = server.NewRedditClient("https://oauth.reddit.com/api/v1")
 
 	// Enable CORS for Swagger-UI
 	// TODO behind config flag as well?
@@ -57,10 +60,10 @@ func main() {
 		MaxAge:1000,
 	})
 
-	handler := c.Handler(server)
+	handler := c.Handler(srv)
 
 	// TODO: flag to enable TLS?
-	srv := &http.Server{
+	httpSrv := &http.Server{
 		Handler: handler,
 		Addr:    fmt.Sprintf(":%s", port),
 		WriteTimeout: 15 * time.Second,
@@ -68,13 +71,13 @@ func main() {
 	}
 
 	// TODO: config
-	server.SetHost("http://localhost:8000")
+	srv.SetHost("http://localhost:8000")
 
 	log.Println("Serving...")
-	log.Println(srv.ListenAndServe())
+	log.Println(httpSrv.ListenAndServe())
 }
 
-func setupAuth(server *app.Server) {
+func setupAuth(server *server.Server) {
 	keyFile, err := os.Open("jwtRS256.key")
 	if err != nil {
 		log.Fatalf("error opening secret key file: %s", err.Error())

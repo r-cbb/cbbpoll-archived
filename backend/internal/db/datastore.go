@@ -265,7 +265,7 @@ func (db *DatastoreClient) AddPoll(newPoll models.Poll) (poll models.Poll, err e
 		return models.Poll{}, errors.E(op, "error on Put operation for Poll", errors.KindDatabaseError, err)
 	}
 
-	return poll, nil
+	return newPoll, nil
 }
 
 func (db *DatastoreClient) GetPoll(season int, week int) (poll models.Poll, err error) {

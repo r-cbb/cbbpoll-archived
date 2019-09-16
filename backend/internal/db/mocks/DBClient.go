@@ -10,6 +10,48 @@ type DBClient struct {
 	mock.Mock
 }
 
+// AddBallot provides a mock function with given fields: newBallot
+func (_m *DBClient) AddBallot(newBallot models.Ballot) (models.Ballot, error) {
+	ret := _m.Called(newBallot)
+
+	var r0 models.Ballot
+	if rf, ok := ret.Get(0).(func(models.Ballot) models.Ballot); ok {
+		r0 = rf(newBallot)
+	} else {
+		r0 = ret.Get(0).(models.Ballot)
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(models.Ballot) error); ok {
+		r1 = rf(newBallot)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// AddPoll provides a mock function with given fields: newPoll
+func (_m *DBClient) AddPoll(newPoll models.Poll) (models.Poll, error) {
+	ret := _m.Called(newPoll)
+
+	var r0 models.Poll
+	if rf, ok := ret.Get(0).(func(models.Poll) models.Poll); ok {
+		r0 = rf(newPoll)
+	} else {
+		r0 = ret.Get(0).(models.Poll)
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(models.Poll) error); ok {
+		r1 = rf(newPoll)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // AddTeam provides a mock function with given fields: newTeam
 func (_m *DBClient) AddTeam(newTeam models.Team) (models.Team, error) {
 	ret := _m.Called(newTeam)
@@ -45,6 +87,48 @@ func (_m *DBClient) AddUser(newUser models.User) (models.User, error) {
 	var r1 error
 	if rf, ok := ret.Get(1).(func(models.User) error); ok {
 		r1 = rf(newUser)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetBallot provides a mock function with given fields: id
+func (_m *DBClient) GetBallot(id int64) (models.Ballot, error) {
+	ret := _m.Called(id)
+
+	var r0 models.Ballot
+	if rf, ok := ret.Get(0).(func(int64) models.Ballot); ok {
+		r0 = rf(id)
+	} else {
+		r0 = ret.Get(0).(models.Ballot)
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(int64) error); ok {
+		r1 = rf(id)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetPoll provides a mock function with given fields: season, week
+func (_m *DBClient) GetPoll(season int, week int) (models.Poll, error) {
+	ret := _m.Called(season, week)
+
+	var r0 models.Poll
+	if rf, ok := ret.Get(0).(func(int, int) models.Poll); ok {
+		r0 = rf(season, week)
+	} else {
+		r0 = ret.Get(0).(models.Poll)
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(int, int) error); ok {
+		r1 = rf(season, week)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -115,4 +199,18 @@ func (_m *DBClient) GetUser(name string) (models.User, error) {
 	}
 
 	return r0, r1
+}
+
+// UpdateUser provides a mock function with given fields: user
+func (_m *DBClient) UpdateUser(user models.User) error {
+	ret := _m.Called(user)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(models.User) error); ok {
+		r0 = rf(user)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
 }

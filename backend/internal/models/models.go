@@ -40,7 +40,7 @@ type Poll struct {
 	// example: 2020
 	Season int `json:"season"`
 	// example: 3
-	Week      int       `json:"week"`
+	Week int `json:"week"`
 	// description: used to "pretty up" polls like Preseason, Postseason, "Way-too-early", etc.  Empty otherwise.
 	WeekName  string    `json:"week_name,omitempty"`
 	OpenTime  time.Time `json:"open_time"`
@@ -81,4 +81,8 @@ type UserToken struct {
 
 func (u UserToken) LoggedIn() bool {
 	return u.Nickname != ""
+}
+
+func (u UserToken) CanManagePolls() bool {
+	return u.IsAdmin
 }
