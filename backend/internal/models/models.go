@@ -37,6 +37,7 @@ type VoterEvent struct {
 }
 
 type Poll struct {
+	ID int64 `json:"id"`
 	// example: 2020
 	Season int `json:"season"`
 	// example: 3
@@ -49,6 +50,7 @@ type Poll struct {
 
 type Ballot struct {
 	ID          int64     `json:"id"`
+	Poll        int64     `json:"poll_id"`
 	UpdatedTime time.Time `json:"updated_time"`
 	User        string    `json:"user"`
 	Votes       []Vote    `json:"votes"`
@@ -57,7 +59,7 @@ type Ballot struct {
 
 type Vote struct {
 	// example: 1
-	TeamID uint64 `json:"team_id"`
+	TeamID int64 `json:"team_id"`
 	// example: 1
 	Rank int `json:"rank"`
 	// example: Great away performances so far led by a strong senior class.

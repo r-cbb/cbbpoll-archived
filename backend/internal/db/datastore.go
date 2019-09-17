@@ -260,22 +260,24 @@ func (db *DatastoreClient) AddPoll(newPoll models.Poll) (poll models.Poll, err e
 
 	k := datastore.IncompleteKey("Poll", nil)
 
-	_, err = db.client.Put(ctx, k, &newPoll)
+	k, err = db.client.Put(ctx, k, &newPoll)
 	if err != nil {
 		return models.Poll{}, errors.E(op, "error on Put operation for Poll", errors.KindDatabaseError, err)
 	}
 
+	newPoll.ID = k.ID
+
 	return newPoll, nil
 }
 
-func (db *DatastoreClient) GetPoll(season int, week int) (poll models.Poll, err error) {
+func (db *DatastoreClient) GetPoll(season int, week int) (models.Poll, error) {
 	const op errors.Op = "datastore.GetPoll"
 	ctx := context.Background()
 
 	q := datastore.NewQuery("Poll").Filter("Season =", season).Filter("Week =", week)
 
 	var polls []models.Poll
-	_, err = db.client.GetAll(ctx, q, &polls)
+	ks, err := db.client.GetAll(ctx, q, &polls)
 	if err != nil {
 		return models.Poll{}, errors.E(op, "error on Get operation for Poll", errors.KindDatabaseError, err)
 	}
@@ -288,13 +290,109 @@ func (db *DatastoreClient) GetPoll(season int, week int) (poll models.Poll, err 
 		return models.Poll{}, errors.E(op, "poll not found", errors.KindNotFound)
 	}
 
-	return polls[0], nil
+	poll := polls[0]
+	poll.ID = ks[0].ID
+
+	return poll, nil
 }
 
-func (db *DatastoreClient) AddBallot(newBallot models.Ballot) (ballot models.Ballot, err error) {
-	panic("implement me")
+type Ballot struct {
+	ID          int64
+	Poll        *datastore.Key
+	UpdatedTime time.Time
+	User        string
+	Votes       []models.Vote
+	IsOfficial  bool
+}
+
+func ballotToContract(b Ballot) models.Ballot {
+	contract := models.Ballot{
+		ID: b.ID,
+		Poll: b.Poll.ID,
+		UpdatedTime: b.UpdatedTime,
+		User: b.User,
+		Votes: b.Votes,
+		IsOfficial: b.IsOfficial,
+	}
+
+	return contract
+}
+
+func ballotFromContract(c models.Ballot) Ballot {
+	ballot := Ballot{
+		ID: c.ID,
+		Poll: datastore.IDKey("Poll", c.Poll, nil),
+		UpdatedTime: c.UpdatedTime,
+		User: c.User,
+		Votes: c.Votes,
+		IsOfficial: c.IsOfficial,
+	}
+
+	return ballot
+}
+
+func (db *DatastoreClient) AddBallot(newBallot models.Ballot) (models.Ballot, error) {
+	const op errors.Op = "datastore.AddBallot"
+	ctx := context.Background()
+
+	// get next available ID
+	newId, err := db.nextID("Ballot")
+	if err != nil {
+		return models.Ballot{}, errors.E(op, "error finding next available ID", err)
+	}
+	newBallot.ID = newId
+
+	ballot := ballotFromContract(newBallot)
+	k := datastore.IDKey("Ballot", newId,nil)
+
+	tx, err := db.client.NewTransaction(ctx)
+	if err != nil {
+		return models.Ballot{}, errors.E(op, "could not create transaction", errors.KindDatabaseError, err)
+	}
+
+	var tmp models.Team
+
+	// Perform a Get or Put to ensure atomicity
+	err = tx.Get(k, &tmp)
+	if err == nil || err != datastore.ErrNoSuchEntity {
+		if err == nil {
+			err = fmt.Errorf("Datastore 'Get or Put' failed")
+		}
+		_ = tx.Rollback()
+		return models.Ballot{}, errors.E(op, "concurrency error adding Ballot", errors.KindConcurrencyProblem, err)
+	}
+
+	pk, err := tx.Put(k, &ballot)
+	if err != nil {
+		_ = tx.Rollback()
+		return models.Ballot{}, errors.E(op, "error on Put operation for Ballot", errors.KindDatabaseError, err)
+	}
+
+	c, err := tx.Commit()
+	if err != nil {
+		return models.Ballot{}, errors.E(op, "error committing transaction", errors.KindDatabaseError, err)
+	}
+
+	k = c.Key(pk)
+	if k.ID != newId {
+		panic("keys don't match")
+	}
+
+	return ballotToContract(ballot), nil
 }
 
 func (db *DatastoreClient) GetBallot(id int64) (ballot models.Ballot, err error) {
-	panic("implement me")
+	const op errors.Op = "datastore.GetBallot"
+	ctx := context.Background()
+
+	k := datastore.IDKey("Ballot", id, nil)
+	err = db.client.Get(ctx, k, &ballot)
+
+	if err == datastore.ErrNoSuchEntity {
+		err = errors.E(errors.KindNotFound, op, err)
+	} else if err != nil {
+		err = errors.E(op, err)
+	}
+
+	return
 }

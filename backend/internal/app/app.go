@@ -2,7 +2,6 @@ package app
 
 import (
 	"fmt"
-
 	"github.com/r-cbb/cbbpoll/internal/db"
 	"github.com/r-cbb/cbbpoll/internal/errors"
 	"github.com/r-cbb/cbbpoll/internal/models"
@@ -62,8 +61,16 @@ func (ps PollService) AllTeams() (teams []models.Team, err error) {
 
 // NewUser is only to be used when a user logs in who does not have a user record
 // in the database.  This will create the user with base permissions.
-func (ps PollService) NewUser(newUser models.User) (models.User, error) {
+func (ps PollService) NewUser(nickname string) (models.User, error) {
 	const op errors.Op = "app.NewUser"
+	newUser := models.User{
+		Nickname: nickname,
+	}
+
+	if nickname == "Concision" {
+		newUser.IsAdmin = true
+	}
+
 	createdUser, err := ps.Db.AddUser(newUser)
 	if err != nil {
 		return models.User{}, errors.E(op, err, "error adding user to db")
@@ -166,4 +173,35 @@ func (ps PollService) GetPoll(season int, week int) (models.Poll, error) {
 	}
 
 	return poll, nil
+}
+
+func (ps PollService) AddBallot(user models.UserToken, ballot models.Ballot) (models.Ballot, error) {
+	const op errors.Op = "app.AddBallot"
+	if !user.LoggedIn() {
+		return models.Ballot{}, errors.E(op, errors.KindUnauthenticated)
+	}
+
+	// Todo handle voter status
+
+	// todo Validate ballot
+
+	newBallot, err := ps.Db.AddBallot(ballot)
+	if err != nil {
+		return models.Ballot{}, errors.E(op, err, "error adding ballot to DB")
+	}
+
+	return newBallot, nil
+}
+
+func (ps PollService) GetBallotById(user models.UserToken, id int64) (models.Ballot, error) {
+	const op errors.Op = "app.BetBallotById"
+
+	// todo handle permission to view this ballot
+
+	ballot, err := ps.Db.GetBallot(id)
+	if err != nil {
+		return models.Ballot{}, errors.E(op, err, "error retrieving ballot from DB")
+	}
+
+	return ballot, nil
 }

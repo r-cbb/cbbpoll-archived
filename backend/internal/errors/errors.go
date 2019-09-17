@@ -29,6 +29,10 @@ const (
 )
 
 func (e Error) Error() string {
+	if e.Err == nil {
+		return e.Msg
+	}
+
 	if e.Msg != "" {
 		return fmt.Sprintf("%s: %s", e.Msg, e.Err.Error())
 	}

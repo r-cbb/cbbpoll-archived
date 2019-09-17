@@ -40,7 +40,7 @@ func (s *Server) Routes() {
 	s.router.HandleFunc(fmt.Sprintf("%s/ballots", v1), s.handleAddBallot()).Methods(http.MethodPost)
 	s.router.HandleFunc(fmt.Sprintf("%s/ballots", v1), s.handleListBallots()).Methods(http.MethodGet)
 	s.router.HandleFunc(fmt.Sprintf("%s/ballots/{id:[0-9]+}", v1), s.handleEditBallot()).Methods(http.MethodPut)
-	s.router.HandleFunc(fmt.Sprintf("%s/ballots/{id:[0-9]+}", v1), s.handleGetBallot()).Methods(http.MethodGet)
+	s.router.HandleFunc(fmt.Sprintf("%s/ballots/{id:[0-9]+}", v1), s.handleGetBallot()).Methods(http.MethodGet).Name("ballot")
 }
 
 func (s *Server) AuthRoutes() {
@@ -272,6 +272,7 @@ func (s *Server) handleAddPoll() http.HandlerFunc {
 		newPoll, err := s.App.AddPoll(token, poll)
 
 		if err != nil {
+			log.Println(err.Error())
 			s.respond(w, r, nil, http.StatusInternalServerError)
 			return
 		}
@@ -327,12 +328,59 @@ func (s *Server) handleGetPoll() http.HandlerFunc {
 
 func (s *Server) handleAddBallot() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		token := s.AuthClient.UserTokenFromCtx(r.Context())
 
+		var ballot models.Ballot
+		err := s.decode(w, r, &ballot)
+		if err != nil {
+			s.respond(w, r, nil, http.StatusBadRequest)
+			return
+		}
+
+		newBallot, err := s.App.AddBallot(token, ballot)
+
+		if err != nil {
+			log.Println(err.Error())
+			s.respond(w, r, nil, http.StatusInternalServerError)
+			return
+		}
+
+		url, err := s.router.Get("ballot").URLPath("id", strconv.FormatInt(int64(newBallot.ID), 10))
+		if err != nil {
+			log.Println(fmt.Sprintf("Error retrieving url for created ballot: %s", err.Error()))
+		} else {
+			w.Header().Set("Location", fmt.Sprintf("%s%s", s.host, url))
+		}
+
+		s.respond(w, r, newBallot, http.StatusCreated)
+		return
 	}
 }
 
 func (s *Server) handleGetBallot() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		token := s.AuthClient.UserTokenFromCtx(r.Context())
+		vars := mux.Vars(r)
+		id := vars["id"]
+		intId, err := strconv.ParseInt(id, 10, 64)
+		if err != nil {
+			s.respond(w, r, nil, http.StatusBadRequest)
+			return
+		}
+
+		ballot, err := s.App.GetBallotById(token, intId)
+
+		if err != nil {
+			if errors.Kind(err) == errors.KindNotFound {
+				s.respond(w, r, nil, http.StatusNotFound)
+				return
+			}
+
+			s.respond(w, r, nil, http.StatusInternalServerError)
+			return
+		}
+
+		s.respond(w, r, ballot, http.StatusOK)
 		return
 	}
 }
@@ -377,15 +425,9 @@ func (s *Server) handleNewSession() http.HandlerFunc {
 
 		// Get user
 		var newUser bool
-		var createdUser models.User
 		user, err := s.App.GetUser(name)
 		if errors.Kind(err) == errors.KindNotFound {
-			// TODO: fill in IsAdmin by comparing username to list stored locally, maybe in a file.
-			user = models.User{
-				Nickname: name,
-				IsAdmin:  false,
-			}
-			createdUser, err = s.App.NewUser(user)
+			user, err = s.App.NewUser(name)
 			if err != nil {
 				s.respond(w, r, nil, http.StatusInternalServerError)
 				return
@@ -411,7 +453,7 @@ func (s *Server) handleNewSession() http.HandlerFunc {
 		if newUser {
 			status = http.StatusCreated
 
-			url, err := s.router.Get("user").URLPath("name", createdUser.Nickname)
+			url, err := s.router.Get("user").URLPath("name", user.Nickname)
 			if err != nil {
 				s.respond(w, r, nil, http.StatusInternalServerError)
 				return
