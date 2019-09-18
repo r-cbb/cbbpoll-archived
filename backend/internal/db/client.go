@@ -12,8 +12,11 @@ type DBClient interface {
 	GetUser(name string) (user models.User, err error)
 
 	AddPoll(newPoll models.Poll) (poll models.Poll, err error)
-	GetPoll(season int, week int) (poll models.Poll, err error)
+	UpdatePoll(poll models.Poll) error
+	GetPoll(id int64) (poll models.Poll, err error)
+	GetPollByWeek(season int, week int) (poll models.Poll, err error)
 
 	AddBallot(newBallot models.Ballot) (ballot models.Ballot, err error)
 	GetBallot(id int64) (ballot models.Ballot, err error)
+	DeleteBallot(id int64) (err error)
 }

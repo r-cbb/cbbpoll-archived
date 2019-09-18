@@ -5,10 +5,13 @@ import (
 	"github.com/r-cbb/cbbpoll/internal/db"
 	"github.com/r-cbb/cbbpoll/internal/errors"
 	"github.com/r-cbb/cbbpoll/internal/models"
+	"log"
+	"sort"
 )
 
 type PollService struct {
-	Db db.DBClient
+	Db     db.DBClient
+	Admins []string
 }
 
 func NewPollService(Db db.DBClient) *PollService {
@@ -152,7 +155,7 @@ func (ps PollService) AddPoll(user models.UserToken, poll models.Poll) (models.P
 		return models.Poll{}, errors.E(op, errors.KindUnauthorized, "user doesn't have sufficient permissions to add a poll")
 	}
 
-	_, err := ps.Db.GetPoll(poll.Season, poll.Week)
+	_, err := ps.Db.GetPollByWeek(poll.Season, poll.Week)
 	if errors.Kind(err) != errors.KindNotFound {
 		return models.Poll{}, errors.E(op, errors.KindConflict, fmt.Sprintf("poll already exists for season %v week %v", poll.Season, poll.Week))
 	}
@@ -165,11 +168,92 @@ func (ps PollService) AddPoll(user models.UserToken, poll models.Poll) (models.P
 	return newPoll, nil
 }
 
-func (ps PollService) GetPoll(season int, week int) (models.Poll, error) {
-	const op errors.Op = "app.GetPoll"
-	poll, err := ps.Db.GetPoll(season, week)
+func (ps PollService) GetPollByWeek(season int, week int) (models.Poll, error) {
+	const op errors.Op = "app.GetPollByWeek"
+	poll, err := ps.Db.GetPollByWeek(season, week)
 	if err != nil {
 		return models.Poll{}, errors.E(op, err, "error retrieving poll from db")
+	}
+
+	if poll.Results != nil {
+		return poll, nil
+	}
+
+	poll, err = ps.calcPollResults(poll)
+	if err != nil {
+		return models.Poll{}, errors.E(op, err, "error calculating poll results")
+	}
+
+	return poll, nil
+}
+
+type resultsSlice []models.Result
+
+func (rs resultsSlice) Len() int {
+	return len(rs)
+}
+
+func (rs resultsSlice) Less(i, j int) bool {
+	return rs[i].Points > rs[j].Points
+}
+
+func (rs resultsSlice) Swap(i, j int) {
+	rs[i], rs[j] = rs[j], rs[i]
+}
+
+func (ps PollService) GetPoll(id int64) (models.Poll, error) {
+	const op errors.Op = "app.GetPoll"
+	poll, err := ps.Db.GetPoll(id)
+	if err != nil {
+		return models.Poll{}, errors.E(op, err, "error retrieving poll from db")
+	}
+
+	if poll.Results != nil {
+		return poll, nil
+	}
+
+	poll, err = ps.calcPollResults(poll)
+	if err != nil {
+		return models.Poll{}, errors.E(op, err, "error calculating poll results")
+	}
+
+	return poll, nil
+}
+
+func (ps PollService) calcPollResults(poll models.Poll) (models.Poll, error) {
+	const op errors.Op = "app.calcPollResults"
+	log.Println("Calculating results")
+	// calculate and store results
+	resMap := make(map[int64]models.Result)
+
+	for _, ballot := range poll.Ballots {
+		dbBallot, err := ps.Db.GetBallot(ballot.ID)
+		if err != nil {
+			return models.Poll{}, errors.E(op, err, "error retrieving ballot associated with poll")
+		}
+
+		for _, vote := range dbBallot.Votes {
+			res := resMap[vote.TeamID]
+			if vote.Rank == 1 {
+				res.FirstPlaceVotes = res.FirstPlaceVotes + 1
+			}
+			res.Points = res.Points + 26 - vote.Rank
+			resMap[vote.TeamID] = res
+		}
+	}
+
+	results := make(resultsSlice, 0, 25)
+	for k, v := range resMap {
+		v.TeamID = k
+		results = append(results, v)
+	}
+
+	sort.Sort(results)
+	poll.Results = results
+
+	err := ps.Db.UpdatePoll(poll)
+	if err != nil {
+		return models.Poll{}, errors.E(op, err, "error updating poll after calculating results")
 	}
 
 	return poll, nil
@@ -193,8 +277,31 @@ func (ps PollService) AddBallot(user models.UserToken, ballot models.Ballot) (mo
 	return newBallot, nil
 }
 
+func (ps PollService) DeleteBallot(user models.UserToken, id int64) error {
+	const op errors.Op = "app.DeleteBallot"
+	if !user.LoggedIn() {
+		return errors.E(op, errors.KindUnauthenticated)
+	}
+
+	ballot, err := ps.Db.GetBallot(id)
+	if err != nil {
+		return errors.E(op, "error getting ballot", err)
+	}
+
+	if ballot.User != user.Nickname && !user.IsAdmin {
+		return errors.E(op, errors.KindUnauthorized, "can't delete someone else's ballot")
+	}
+
+	err = ps.Db.DeleteBallot(id)
+	if err != nil {
+		return errors.E(op, err, "error deleting ballot")
+	}
+
+	return nil
+}
+
 func (ps PollService) GetBallotById(user models.UserToken, id int64) (models.Ballot, error) {
-	const op errors.Op = "app.BetBallotById"
+	const op errors.Op = "app.GetBallotById"
 
 	// todo handle permission to view this ballot
 

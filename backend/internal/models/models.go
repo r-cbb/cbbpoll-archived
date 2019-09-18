@@ -14,6 +14,7 @@ type Team struct {
 	FullName string `json:"full_name"`
 	// example: Arizona
 	ShortName string `json:"short_name"`
+	Slug      string `json:"slug"`
 	// example: Wildcats
 	Nickname string `json:"nickname"`
 	// example: Pac-12
@@ -27,8 +28,9 @@ type User struct {
 	// example: false
 	IsAdmin bool `json:"is_admin"`
 	// example: true
-	IsVoter     bool         `json:"is_voter"`
-	VoterEvents []VoterEvent `json:"voter_events,omitempty"`
+	IsVoter         bool         `json:"is_voter"`
+	TeamAffiliation int64        `json:"team_affiliation"`
+	VoterEvents     []VoterEvent `json:"voter_events,omitempty"`
 }
 
 type VoterEvent struct {
@@ -43,9 +45,25 @@ type Poll struct {
 	// example: 3
 	Week int `json:"week"`
 	// description: used to "pretty up" polls like Preseason, Postseason, "Way-too-early", etc.  Empty otherwise.
-	WeekName  string    `json:"week_name,omitempty"`
-	OpenTime  time.Time `json:"open_time"`
-	CloseTime time.Time `json:"close_time"`
+	WeekName     string      `json:"week_name,omitempty"`
+	OpenTime     time.Time   `json:"open_time"`
+	CloseTime    time.Time   `json:"close_time"`
+	LastModified time.Time   `json:"-"`
+	Results      []Result    `json:"results"`
+	Ballots      []BallotRef `json:"ballots"`
+}
+
+type BallotRef struct {
+	ID   int64  `json:"id"`
+	User string `json:"user"`
+}
+
+type Result struct {
+	TeamID int64
+	// Rank of 0 represents "also receiving votes"
+	Rank            int
+	FirstPlaceVotes int
+	Points          int
 }
 
 type Ballot struct {

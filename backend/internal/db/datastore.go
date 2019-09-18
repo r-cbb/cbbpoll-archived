@@ -259,6 +259,7 @@ func (db *DatastoreClient) AddPoll(newPoll models.Poll) (poll models.Poll, err e
 	ctx := context.Background()
 
 	k := datastore.IncompleteKey("Poll", nil)
+	newPoll.LastModified = time.Now()
 
 	k, err = db.client.Put(ctx, k, &newPoll)
 	if err != nil {
@@ -270,8 +271,23 @@ func (db *DatastoreClient) AddPoll(newPoll models.Poll) (poll models.Poll, err e
 	return newPoll, nil
 }
 
-func (db *DatastoreClient) GetPoll(season int, week int) (models.Poll, error) {
+func (db *DatastoreClient) GetPoll(id int64) (models.Poll, error) {
 	const op errors.Op = "datastore.GetPoll"
+	ctx := context.Background()
+
+	k := datastore.IDKey("Poll", id, nil)
+	var poll models.Poll
+	err := db.client.Get(ctx, k, &poll)
+	if err != nil {
+		return models.Poll{}, errors.E(op, errors.KindDatabaseError, "error on Get operation for poll", err)
+	}
+	poll.ID = id
+
+	return poll, nil
+}
+
+func (db *DatastoreClient) GetPollByWeek(season int, week int) (models.Poll, error) {
+	const op errors.Op = "datastore.GetPollByWeek"
 	ctx := context.Background()
 
 	q := datastore.NewQuery("Poll").Filter("Season =", season).Filter("Week =", week)
@@ -296,23 +312,62 @@ func (db *DatastoreClient) GetPoll(season int, week int) (models.Poll, error) {
 	return poll, nil
 }
 
+func (db *DatastoreClient) UpdatePoll(poll models.Poll) error {
+	const op errors.Op = "datastore.UpdatePoll"
+	ctx := context.Background()
+
+	tx, err := db.client.NewTransaction(ctx)
+	if err != nil {
+		return errors.E(op, errors.KindDatabaseError, "unable to create transaction", err)
+	}
+
+	k := datastore.IDKey("Poll", poll.ID, nil)
+	var tmp models.Poll
+	err = tx.Get(k, &tmp)
+	if err != nil {
+		_ = tx.Rollback()
+		return errors.E(op, errors.KindDatabaseError, "unable to retrieve poll", err)
+	}
+
+	if tmp.LastModified != poll.LastModified {
+		// Poll has changed since client made their modifications. Return an error
+		// to keep results consistent.
+		err = errors.E(op, errors.KindConcurrencyProblem, "poll out of date when attempting to update")
+		_ = tx.Rollback()
+		return err
+	}
+
+	_, err = tx.Put(k, &poll)
+	if err != nil {
+		_ = tx.Rollback()
+		return errors.E(op, errors.KindDatabaseError, "error writing poll to db", err)
+	}
+
+	_, err = tx.Commit()
+	if err != nil {
+		return errors.E(op, errors.KindDatabaseError, "error committing transaction", err)
+	}
+
+	return nil
+}
+
 type Ballot struct {
 	ID          int64
 	Poll        *datastore.Key
 	UpdatedTime time.Time
-	User        string
+	User        *datastore.Key
 	Votes       []models.Vote
 	IsOfficial  bool
 }
 
 func ballotToContract(b Ballot) models.Ballot {
 	contract := models.Ballot{
-		ID: b.ID,
-		Poll: b.Poll.ID,
+		ID:          b.ID,
+		Poll:        b.Poll.ID,
 		UpdatedTime: b.UpdatedTime,
-		User: b.User,
-		Votes: b.Votes,
-		IsOfficial: b.IsOfficial,
+		User:        b.User.Name,
+		Votes:       b.Votes,
+		IsOfficial:  b.IsOfficial,
 	}
 
 	return contract
@@ -320,12 +375,12 @@ func ballotToContract(b Ballot) models.Ballot {
 
 func ballotFromContract(c models.Ballot) Ballot {
 	ballot := Ballot{
-		ID: c.ID,
-		Poll: datastore.IDKey("Poll", c.Poll, nil),
+		ID:          c.ID,
+		Poll:        datastore.IDKey("Poll", c.Poll, nil),
 		UpdatedTime: c.UpdatedTime,
-		User: c.User,
-		Votes: c.Votes,
-		IsOfficial: c.IsOfficial,
+		User:        datastore.NameKey("User", c.User, nil),
+		Votes:       c.Votes,
+		IsOfficial:  c.IsOfficial,
 	}
 
 	return ballot
@@ -343,14 +398,14 @@ func (db *DatastoreClient) AddBallot(newBallot models.Ballot) (models.Ballot, er
 	newBallot.ID = newId
 
 	ballot := ballotFromContract(newBallot)
-	k := datastore.IDKey("Ballot", newId,nil)
+	k := datastore.IDKey("Ballot", newId, nil)
 
 	tx, err := db.client.NewTransaction(ctx)
 	if err != nil {
 		return models.Ballot{}, errors.E(op, "could not create transaction", errors.KindDatabaseError, err)
 	}
 
-	var tmp models.Team
+	var tmp models.Ballot
 
 	// Perform a Get or Put to ensure atomicity
 	err = tx.Get(k, &tmp)
@@ -368,6 +423,22 @@ func (db *DatastoreClient) AddBallot(newBallot models.Ballot) (models.Ballot, er
 		return models.Ballot{}, errors.E(op, "error on Put operation for Ballot", errors.KindDatabaseError, err)
 	}
 
+	var poll models.Poll
+	err = tx.Get(ballot.Poll, &poll)
+	if err != nil {
+		_ = tx.Rollback()
+		return models.Ballot{}, errors.E(op, "error retrieving poll for Ballot", errors.KindDatabaseError)
+	}
+
+	poll.Ballots = append(poll.Ballots, models.BallotRef{ID: newId, User: ballot.User.Name})
+	poll.Results = nil
+	poll.LastModified = time.Now()
+	_, err = tx.Put(ballot.Poll, &poll)
+	if err != nil {
+		_ = tx.Rollback()
+		return models.Ballot{}, errors.E(op, "error adding Ballot to Poll entity", errors.KindDatabaseError)
+	}
+
 	c, err := tx.Commit()
 	if err != nil {
 		return models.Ballot{}, errors.E(op, "error committing transaction", errors.KindDatabaseError, err)
@@ -381,18 +452,124 @@ func (db *DatastoreClient) AddBallot(newBallot models.Ballot) (models.Ballot, er
 	return ballotToContract(ballot), nil
 }
 
+func (db *DatastoreClient) EditBallot(ballot models.Ballot) error {
+	const op errors.Op = "datastore.EditBallot"
+	ctx := context.Background()
+
+	dbBallot := ballotFromContract(ballot)
+	k := datastore.IDKey("Ballot", dbBallot.ID, nil)
+	pollKey := dbBallot.Poll
+
+	tx, err := db.client.NewTransaction(ctx)
+	if err != nil {
+		return errors.E(op, "could not create transaction", errors.KindDatabaseError, err)
+	}
+
+	var poll models.Poll
+
+	err = tx.Get(pollKey, &poll)
+	if err != nil {
+		_ = tx.Rollback()
+		return errors.E(op, "error retrieving poll for Ballot", errors.KindDatabaseError, err)
+	}
+
+	// invalidate poll results
+	poll.Results = nil
+	poll.LastModified = time.Now()
+	_, err = tx.Put(pollKey, &poll)
+	if err != nil {
+		_ = tx.Rollback()
+		return errors.E(op, "error clearing poll results", errors.KindDatabaseError, err)
+	}
+
+	_, err = tx.Put(k, &dbBallot)
+	if err != nil {
+		_ = tx.Rollback()
+		return errors.E(op, "error updating poll", errors.KindDatabaseError, err)
+	}
+
+	_, err = tx.Commit()
+	if err != nil {
+		return errors.E(op, "error committing transaction", errors.KindDatabaseError, err)
+	}
+
+	return nil
+}
+
+func (db *DatastoreClient) DeleteBallot(id int64) error {
+	const op errors.Op = "datastore.DeleteBallot"
+	ctx := context.Background()
+
+	k := datastore.IDKey("Ballot", id, nil)
+
+	tx, err := db.client.NewTransaction(ctx)
+	if err != nil {
+		return errors.E(op, "could not create transaction", errors.KindDatabaseError, err)
+	}
+
+	var poll models.Poll
+	var ballot Ballot
+
+	err = tx.Get(k, &ballot)
+	if err != nil {
+		if err == datastore.ErrNoSuchEntity {
+			err = errors.E(op, "ballot doesn't exist", errors.KindNotFound, err)
+		}
+		_ = tx.Rollback()
+		return errors.E(op, "error retrieving ballot to delete", err)
+	}
+
+	pollKey := ballot.Poll
+	err = tx.Get(pollKey, &poll)
+	if err != nil {
+		_ = tx.Rollback()
+		return errors.E(op, "error retrieving poll for ballot", errors.KindDatabaseError, err)
+	}
+
+	newBallots := make([]models.BallotRef, 0, len(poll.Ballots))
+	for _, ref := range poll.Ballots {
+		if ref.ID != id {
+			newBallots = append(newBallots, ref)
+		}
+	}
+	poll.Ballots = newBallots
+	poll.Results = nil
+	poll.LastModified = time.Now()
+
+	_, err = tx.Put(pollKey, &poll)
+	if err != nil {
+		_ = tx.Rollback()
+		return errors.E(op, "error updating associated poll for deleted ballot", errors.KindDatabaseError, err)
+	}
+
+	err = tx.Delete(k)
+	if err != nil {
+		_ = tx.Rollback()
+		return errors.E(op, "error deleting ballot", errors.KindDatabaseError, err)
+	}
+
+	_, err = tx.Commit()
+	if err != nil {
+		_ = tx.Rollback()
+		return errors.E(op, "error committing transaction", errors.KindDatabaseError, err)
+	}
+
+	return nil
+}
+
 func (db *DatastoreClient) GetBallot(id int64) (ballot models.Ballot, err error) {
 	const op errors.Op = "datastore.GetBallot"
 	ctx := context.Background()
 
+	var b Ballot
 	k := datastore.IDKey("Ballot", id, nil)
-	err = db.client.Get(ctx, k, &ballot)
+	err = db.client.Get(ctx, k, &b)
 
 	if err == datastore.ErrNoSuchEntity {
 		err = errors.E(errors.KindNotFound, op, err)
 	} else if err != nil {
-		err = errors.E(op, err)
+		err = errors.E(errors.KindDatabaseError, op, err)
 	}
 
-	return
+	return ballotToContract(b), nil
 }

@@ -94,6 +94,20 @@ func (_m *DBClient) AddUser(newUser models.User) (models.User, error) {
 	return r0, r1
 }
 
+// DeleteBallot provides a mock function with given fields: id
+func (_m *DBClient) DeleteBallot(id int64) error {
+	ret := _m.Called(id)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(int64) error); ok {
+		r0 = rf(id)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // GetBallot provides a mock function with given fields: id
 func (_m *DBClient) GetBallot(id int64) (models.Ballot, error) {
 	ret := _m.Called(id)
@@ -115,8 +129,29 @@ func (_m *DBClient) GetBallot(id int64) (models.Ballot, error) {
 	return r0, r1
 }
 
-// GetPoll provides a mock function with given fields: season, week
-func (_m *DBClient) GetPoll(season int, week int) (models.Poll, error) {
+// GetPoll provides a mock function with given fields: id
+func (_m *DBClient) GetPoll(id int64) (models.Poll, error) {
+	ret := _m.Called(id)
+
+	var r0 models.Poll
+	if rf, ok := ret.Get(0).(func(int64) models.Poll); ok {
+		r0 = rf(id)
+	} else {
+		r0 = ret.Get(0).(models.Poll)
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(int64) error); ok {
+		r1 = rf(id)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetPollByWeek provides a mock function with given fields: season, week
+func (_m *DBClient) GetPollByWeek(season int, week int) (models.Poll, error) {
 	ret := _m.Called(season, week)
 
 	var r0 models.Poll
@@ -199,6 +234,20 @@ func (_m *DBClient) GetUser(name string) (models.User, error) {
 	}
 
 	return r0, r1
+}
+
+// UpdatePoll provides a mock function with given fields: poll
+func (_m *DBClient) UpdatePoll(poll models.Poll) error {
+	ret := _m.Called(poll)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(models.Poll) error); ok {
+		r0 = rf(poll)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
 }
 
 // UpdateUser provides a mock function with given fields: user

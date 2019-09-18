@@ -41,6 +41,7 @@ func (s *Server) Routes() {
 	s.router.HandleFunc(fmt.Sprintf("%s/ballots", v1), s.handleListBallots()).Methods(http.MethodGet)
 	s.router.HandleFunc(fmt.Sprintf("%s/ballots/{id:[0-9]+}", v1), s.handleEditBallot()).Methods(http.MethodPut)
 	s.router.HandleFunc(fmt.Sprintf("%s/ballots/{id:[0-9]+}", v1), s.handleGetBallot()).Methods(http.MethodGet).Name("ballot")
+	s.router.HandleFunc(fmt.Sprintf("%s/ballots/{id:[0-9]+}", v1), s.handleDeleteBallot()).Methods(http.MethodDelete)
 }
 
 func (s *Server) AuthRoutes() {
@@ -310,7 +311,7 @@ func (s *Server) handleGetPoll() http.HandlerFunc {
 			s.respond(w, r, nil, http.StatusBadRequest)
 		}
 
-		poll, err := s.App.GetPoll(season, week)
+		poll, err := s.App.GetPollByWeek(season, week)
 		if err != nil {
 			if errors.Kind(err) == errors.KindNotFound {
 				s.respond(w, r, nil, http.StatusNotFound)
@@ -371,6 +372,7 @@ func (s *Server) handleGetBallot() http.HandlerFunc {
 		ballot, err := s.App.GetBallotById(token, intId)
 
 		if err != nil {
+			log.Println(err)
 			if errors.Kind(err) == errors.KindNotFound {
 				s.respond(w, r, nil, http.StatusNotFound)
 				return
@@ -393,6 +395,39 @@ func (s *Server) handleListBallots() http.HandlerFunc {
 
 func (s *Server) handleEditBallot() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		return
+	}
+}
+
+func (s *Server) handleDeleteBallot() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		token := s.AuthClient.UserTokenFromCtx(r.Context())
+		vars := mux.Vars(r)
+		id := vars["id"]
+		intId, err := strconv.ParseInt(id, 10, 64)
+		if err != nil {
+			s.respond(w, r, nil, http.StatusBadRequest)
+		}
+
+		err = s.App.DeleteBallot(token, intId)
+		if err != nil {
+			switch errors.Kind(err) {
+			case errors.KindUnauthenticated:
+				s.respond(w, r, nil, http.StatusUnauthorized)
+				return
+			case errors.KindUnauthorized:
+				s.respond(w, r, nil, http.StatusForbidden)
+				return
+			case errors.KindNotFound:
+				s.respond(w, r, nil, http.StatusNotFound)
+				return
+			default:
+				s.respond(w, r, nil, http.StatusInternalServerError)
+				return
+			}
+		}
+
+		s.respond(w, r, nil, http.StatusOK)
 		return
 	}
 }
