@@ -9,6 +9,7 @@ import (
 
 	"github.com/gorilla/mux"
 
+	"github.com/r-cbb/cbbpoll/internal/db"
 	"github.com/r-cbb/cbbpoll/internal/errors"
 	"github.com/r-cbb/cbbpoll/internal/models"
 )
@@ -27,6 +28,7 @@ func (s *Server) Routes() {
 
 	// Users
 	s.router.HandleFunc(fmt.Sprintf("%s/users", v1), s.handleAddUser()).Methods(http.MethodPost)
+	s.router.HandleFunc(fmt.Sprintf("%s/users", v1), s.handleListUsers()).Methods(http.MethodGet)
 	s.router.HandleFunc(fmt.Sprintf("%s/users/me", v1), s.handleUsersMe()).Methods(http.MethodGet)
 	s.router.HandleFunc(fmt.Sprintf("%s/users/{name}", v1), s.handleGetUser()).Methods(http.MethodGet).Name("user")
 	s.router.HandleFunc(fmt.Sprintf("%s/users/{name}", v1), s.handleUpdateUser()).Methods(http.MethodPut)
@@ -178,6 +180,29 @@ func (s *Server) handleAddUser() http.HandlerFunc {
 		}
 
 		s.respond(w, r, createdUser, http.StatusCreated)
+		return
+	}
+}
+
+func (s *Server) handleListUsers() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		token := s.AuthClient.UserTokenFromCtx(r.Context())
+		filter := db.NewFilter()
+
+		voters := r.URL.Query().Get("is_voter")
+		parsed, err := strconv.ParseBool(voters)
+		if err == nil {
+			filter["IsVoter"] = parsed
+		}
+
+		users, err := s.App.GetUsers(token, filter)
+		if err != nil {
+			log.Println(err.Error())
+			s.respond(w, r, nil, http.StatusInternalServerError)
+			return
+		}
+
+		s.respond(w, r, users, http.StatusOK)
 		return
 	}
 }

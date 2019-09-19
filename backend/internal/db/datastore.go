@@ -157,7 +157,7 @@ func (db *DatastoreClient) GetTeams() (teams []models.Team, err error) {
 	_, err = db.client.GetAll(ctx, q, &teams)
 
 	if err != nil {
-		return nil, errors.E(op, err, errors.KindDatabaseError, "error getting all Teams")
+		return nil, errors.E(op, err, errors.KindDatabaseError, "error getting Teams")
 	}
 
 	return
@@ -177,6 +177,32 @@ func (db *DatastoreClient) GetUser(name string) (user models.User, err error) {
 	}
 
 	return
+}
+
+func (db *DatastoreClient) GetUsers(filters Filter) ([]models.User, error) {
+	const op errors.Op = "datastore.GetUsers"
+	ctx := context.Background()
+
+	q := datastore.NewQuery("User")
+
+	for k, v := range filters {
+		q = q.Filter(k+" =", v)
+	}
+
+	q = q.Order("Nickname")
+
+	var users []models.User
+	_, err := db.client.GetAll(ctx, q, &users)
+	if err != nil {
+		return nil, errors.E(op, err, errors.KindDatabaseError, "error getting Users")
+	}
+
+	// If there are no results, return an empty list instead of nil
+	if users == nil {
+		users = []models.User{}
+	}
+
+	return users, nil
 }
 
 func (db *DatastoreClient) AddUser(user models.User) (models.User, error) {

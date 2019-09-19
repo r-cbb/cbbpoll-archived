@@ -110,6 +110,18 @@ func (ps PollService) GetUser(name string) (models.User, error) {
 	return user, nil
 }
 
+func (ps PollService) GetUsers(user models.UserToken, filter db.Filter) ([]models.User, error) {
+	const op errors.Op = "app.GetUsers"
+	var users []models.User
+
+	users, err := ps.Db.GetUsers(filter)
+	if err != nil {
+		return nil, errors.E(err, op, "error retrieving users from db")
+	}
+
+	return users, nil
+}
+
 func (ps PollService) UpdateUser(user models.UserToken, name string, updatedUser models.User) (models.User, error) {
 	const op errors.Op = "app.UpdateUser"
 	if !user.LoggedIn() {
