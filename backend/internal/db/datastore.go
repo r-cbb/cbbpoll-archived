@@ -179,17 +179,12 @@ func (db *DatastoreClient) GetUser(name string) (user models.User, err error) {
 	return
 }
 
-func (db *DatastoreClient) GetUsers(filters Filter) ([]models.User, error) {
+func (db *DatastoreClient) GetUsers(filters []Filter, sort Sort) ([]models.User, error) {
 	const op errors.Op = "datastore.GetUsers"
 	ctx := context.Background()
 
 	q := datastore.NewQuery("User")
-
-	for k, v := range filters {
-		q = q.Filter(k+" =", v)
-	}
-
-	q = q.Order("Nickname")
+	q = filterAndSort(q, filters, sort)
 
 	var users []models.User
 	_, err := db.client.GetAll(ctx, q, &users)
@@ -203,6 +198,21 @@ func (db *DatastoreClient) GetUsers(filters Filter) ([]models.User, error) {
 	}
 
 	return users, nil
+}
+
+func filterAndSort(q *datastore.Query, filters []Filter, sort Sort) *datastore.Query {
+	for _, filter := range filters {
+		q = q.Filter(fmt.Sprintf("%s %s", filter.Field, filter.Operator), filter.Value)
+	}
+	if sort.field != "" {
+		sortStr := sort.field
+		if !sort.asc {
+			sortStr = "-" + sortStr
+		}
+
+		q = q.Order(sortStr)
+	}
+	return q
 }
 
 func (db *DatastoreClient) AddUser(user models.User) (models.User, error) {

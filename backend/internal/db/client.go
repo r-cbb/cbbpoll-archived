@@ -10,7 +10,7 @@ type DBClient interface {
 	AddUser(newUser models.User) (user models.User, err error)
 	UpdateUser(user models.User) (err error)
 	GetUser(name string) (user models.User, err error)
-	GetUsers(filter Filter) ([]models.User, error)
+	GetUsers(filter []Filter, sort Sort) ([]models.User, error)
 
 	AddPoll(newPoll models.Poll) (poll models.Poll, err error)
 	UpdatePoll(poll models.Poll) error
@@ -22,8 +22,13 @@ type DBClient interface {
 	DeleteBallot(id int64) (err error)
 }
 
-type Filter map[string]interface{}
+type Filter struct {
+	Field    string
+	Operator string
+	Value    interface{}
+}
 
-func NewFilter() Filter {
-	return make(Filter)
+type Sort struct {
+	field string
+	asc   bool
 }

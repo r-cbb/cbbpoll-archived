@@ -2,11 +2,12 @@ package app
 
 import (
 	"fmt"
+	"log"
+	"sort"
+
 	"github.com/r-cbb/cbbpoll/internal/db"
 	"github.com/r-cbb/cbbpoll/internal/errors"
 	"github.com/r-cbb/cbbpoll/internal/models"
-	"log"
-	"sort"
 )
 
 type PollService struct {
@@ -17,6 +18,28 @@ type PollService struct {
 func NewPollService(Db db.DBClient) *PollService {
 	ps := PollService{Db: Db}
 	return &ps
+}
+
+type Options struct {
+	filters []db.Filter
+	sort db.Sort
+}
+
+func NewOptions() Options {
+	opt := Options{
+		filters: make([]db.Filter, 0),
+	}
+
+	return opt
+}
+
+func (opt Options) unpack() ([]db.Filter, db.Sort) {
+	return opt.filters, opt.sort
+}
+
+func (opt Options) IsVoter(b bool) Options {
+	opt.filters = append(opt.filters, db.Filter{Field: "IsVoter", Operator: "=", Value: b})
+	return opt
 }
 
 func (ps PollService) AddTeam(user models.UserToken, newTeam models.Team) (createdTeam models.Team, err error) {
@@ -110,11 +133,11 @@ func (ps PollService) GetUser(name string) (models.User, error) {
 	return user, nil
 }
 
-func (ps PollService) GetUsers(user models.UserToken, filter db.Filter) ([]models.User, error) {
+func (ps PollService) GetUsers(user models.UserToken, opts Options) ([]models.User, error) {
 	const op errors.Op = "app.GetUsers"
 	var users []models.User
 
-	users, err := ps.Db.GetUsers(filter)
+	users, err := ps.Db.GetUsers(opts.unpack())
 	if err != nil {
 		return nil, errors.E(err, op, "error retrieving users from db")
 	}

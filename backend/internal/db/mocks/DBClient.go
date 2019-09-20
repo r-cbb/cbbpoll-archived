@@ -2,6 +2,7 @@
 
 package mocks
 
+import db "github.com/r-cbb/cbbpoll/internal/db"
 import mock "github.com/stretchr/testify/mock"
 import models "github.com/r-cbb/cbbpoll/internal/models"
 
@@ -229,6 +230,29 @@ func (_m *DBClient) GetUser(name string) (models.User, error) {
 	var r1 error
 	if rf, ok := ret.Get(1).(func(string) error); ok {
 		r1 = rf(name)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetUsers provides a mock function with given fields: filter, sort
+func (_m *DBClient) GetUsers(filter []db.Filter, sort db.Sort) ([]models.User, error) {
+	ret := _m.Called(filter, sort)
+
+	var r0 []models.User
+	if rf, ok := ret.Get(0).(func([]db.Filter, db.Sort) []models.User); ok {
+		r0 = rf(filter, sort)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]models.User)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func([]db.Filter, db.Sort) error); ok {
+		r1 = rf(filter, sort)
 	} else {
 		r1 = ret.Error(1)
 	}

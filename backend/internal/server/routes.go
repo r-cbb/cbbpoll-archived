@@ -9,7 +9,7 @@ import (
 
 	"github.com/gorilla/mux"
 
-	"github.com/r-cbb/cbbpoll/internal/db"
+	"github.com/r-cbb/cbbpoll/internal/app"
 	"github.com/r-cbb/cbbpoll/internal/errors"
 	"github.com/r-cbb/cbbpoll/internal/models"
 )
@@ -187,15 +187,14 @@ func (s *Server) handleAddUser() http.HandlerFunc {
 func (s *Server) handleListUsers() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		token := s.AuthClient.UserTokenFromCtx(r.Context())
-		filter := db.NewFilter()
+		opts := app.NewOptions()
 
-		voters := r.URL.Query().Get("is_voter")
-		parsed, err := strconv.ParseBool(voters)
+		voters, err := strconv.ParseBool(r.URL.Query().Get("is_voter"))
 		if err == nil {
-			filter["IsVoter"] = parsed
+			opts = opts.IsVoter(voters)
 		}
 
-		users, err := s.App.GetUsers(token, filter)
+		users, err := s.App.GetUsers(token, opts)
 		if err != nil {
 			log.Println(err.Error())
 			s.respond(w, r, nil, http.StatusInternalServerError)
