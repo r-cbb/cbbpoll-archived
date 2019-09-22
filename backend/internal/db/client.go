@@ -19,7 +19,9 @@ type DBClient interface {
 
 	AddBallot(newBallot models.Ballot) (ballot models.Ballot, err error)
 	GetBallot(id int64) (ballot models.Ballot, err error)
+	GetBallotsByID(ids []int64) (ballots []models.Ballot, err error)
 	DeleteBallot(id int64) (err error)
+	UpdateBallot(ballot models.Ballot) error
 }
 
 type Filter struct {

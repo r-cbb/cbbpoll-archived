@@ -20,28 +20,6 @@ func NewPollService(Db db.DBClient) *PollService {
 	return &ps
 }
 
-type Options struct {
-	filters []db.Filter
-	sort db.Sort
-}
-
-func NewOptions() Options {
-	opt := Options{
-		filters: make([]db.Filter, 0),
-	}
-
-	return opt
-}
-
-func (opt Options) unpack() ([]db.Filter, db.Sort) {
-	return opt.filters, opt.sort
-}
-
-func (opt Options) IsVoter(b bool) Options {
-	opt.filters = append(opt.filters, db.Filter{Field: "IsVoter", Operator: "=", Value: b})
-	return opt
-}
-
 func (ps PollService) AddTeam(user models.UserToken, newTeam models.Team) (createdTeam models.Team, err error) {
 	const op errors.Op = "app.AddTeam"
 	if !user.LoggedIn() {
@@ -93,8 +71,10 @@ func (ps PollService) NewUser(nickname string) (models.User, error) {
 		Nickname: nickname,
 	}
 
-	if nickname == "Concision" {
-		newUser.IsAdmin = true
+	for _, admin := range ps.Admins {
+		if nickname == admin {
+			newUser.IsAdmin = true
+		}
 	}
 
 	createdUser, err := ps.Db.AddUser(newUser)
@@ -261,13 +241,18 @@ func (ps PollService) calcPollResults(poll models.Poll) (models.Poll, error) {
 	// calculate and store results
 	resMap := make(map[int64]models.Result)
 
+	var ballotIds []int64
 	for _, ballot := range poll.Ballots {
-		dbBallot, err := ps.Db.GetBallot(ballot.ID)
-		if err != nil {
-			return models.Poll{}, errors.E(op, err, "error retrieving ballot associated with poll")
-		}
+		ballotIds = append(ballotIds, ballot.ID)
+	}
 
-		for _, vote := range dbBallot.Votes {
+	ballots, err := ps.Db.GetBallotsByID(ballotIds)
+	if err != nil {
+		return models.Poll{}, errors.E(op, err, "error retrieving ballots associated with poll")
+	}
+
+	for _, ballot := range ballots {
+		for _, vote := range ballot.Votes {
 			res := resMap[vote.TeamID]
 			if vote.Rank == 1 {
 				res.FirstPlaceVotes = res.FirstPlaceVotes + 1
@@ -286,7 +271,7 @@ func (ps PollService) calcPollResults(poll models.Poll) (models.Poll, error) {
 	sort.Sort(results)
 	poll.Results = results
 
-	err := ps.Db.UpdatePoll(poll)
+	err = ps.Db.UpdatePoll(poll)
 	if err != nil {
 		return models.Poll{}, errors.E(op, err, "error updating poll after calculating results")
 	}

@@ -373,6 +373,7 @@ func (db *DatastoreClient) UpdatePoll(poll models.Poll) error {
 		return err
 	}
 
+	poll.LastModified = time.Now()
 	_, err = tx.Put(k, &poll)
 	if err != nil {
 		_ = tx.Rollback()
@@ -488,8 +489,8 @@ func (db *DatastoreClient) AddBallot(newBallot models.Ballot) (models.Ballot, er
 	return ballotToContract(ballot), nil
 }
 
-func (db *DatastoreClient) EditBallot(ballot models.Ballot) error {
-	const op errors.Op = "datastore.EditBallot"
+func (db *DatastoreClient) UpdateBallot(ballot models.Ballot) error {
+	const op errors.Op = "datastore.UpdateBallot"
 	ctx := context.Background()
 
 	dbBallot := ballotFromContract(ballot)
@@ -608,4 +609,30 @@ func (db *DatastoreClient) GetBallot(id int64) (ballot models.Ballot, err error)
 	}
 
 	return ballotToContract(b), nil
+}
+
+func (db *DatastoreClient) GetBallotsByID(ids []int64) ([]models.Ballot, error) {
+	const op errors.Op = "datastore.GetBallotsByID"
+	ctx := context.Background()
+
+	var bs []Ballot
+	var ks []*datastore.Key
+
+	for _, id := range ids {
+		ks = append(ks, datastore.IDKey("Ballot", id, nil))
+	}
+
+	err := db.client.GetMulti(ctx, ks, &bs)
+	if err != nil {
+		err = errors.E(errors.KindDatabaseError, op, err, "error retrieving ballots by ID")
+		return nil, err
+	}
+
+	var contracts []models.Ballot
+
+	for _, ballot := range bs {
+		contracts = append(contracts, ballotToContract(ballot))
+	}
+
+	return contracts, nil
 }

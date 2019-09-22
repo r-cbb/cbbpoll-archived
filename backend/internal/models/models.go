@@ -28,9 +28,9 @@ type User struct {
 	// example: false
 	IsAdmin bool `json:"is_admin"`
 	// example: true
-	IsVoter         bool         `json:"is_voter"`
-	TeamAffiliation int64        `json:"team_affiliation"`
-	VoterEvents     []VoterEvent `json:"voter_events,omitempty"`
+	IsVoter     bool         `json:"is_voter"`
+	PrimaryTeam int64        `json:"primary_team"`
+	VoterEvents []VoterEvent `json:"voter_events,omitempty"`
 }
 
 type VoterEvent struct {
@@ -48,22 +48,24 @@ type Poll struct {
 	WeekName     string      `json:"week_name,omitempty"`
 	OpenTime     time.Time   `json:"open_time"`
 	CloseTime    time.Time   `json:"close_time"`
-	LastModified time.Time   `json:"-"`
+	LastModified time.Time   `json:"last_modified"`
 	Results      []Result    `json:"results"`
 	Ballots      []BallotRef `json:"ballots"`
 }
 
 type BallotRef struct {
-	ID   int64  `json:"id"`
-	User string `json:"user"`
+	ID              int64  `json:"id"`
+	User            string `json:"user"`
+	PrimaryTeamSlug string `json:"team_slug"`
 }
 
 type Result struct {
-	TeamID int64
+	TeamID   int64  `json:"team_id"`
+	TeamSlug string `json:"team_slug"`
 	// Rank of 0 represents "also receiving votes"
-	Rank            int
-	FirstPlaceVotes int
-	Points          int
+	Rank            int `json:"rank"`
+	FirstPlaceVotes int `json:"first_place_votes"`
+	Points          int `json:"points"`
 }
 
 type Ballot struct {
