@@ -49,8 +49,6 @@ type Poll struct {
 	OpenTime     time.Time   `json:"open_time"`
 	CloseTime    time.Time   `json:"close_time"`
 	LastModified time.Time   `json:"last_modified"`
-	Results      []Result    `json:"results"`
-	Ballots      []BallotRef `json:"ballots"`
 }
 
 type BallotRef struct {
@@ -61,6 +59,7 @@ type BallotRef struct {
 
 type Result struct {
 	TeamID   int64  `json:"team_id"`
+	TeamName string `json:"team_name"`
 	TeamSlug string `json:"team_slug"`
 	// Rank of 0 represents "also receiving votes"
 	Rank            int `json:"rank"`

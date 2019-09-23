@@ -2,7 +2,6 @@ package app
 
 import (
 	"fmt"
-	"log"
 	"sort"
 
 	"github.com/r-cbb/cbbpoll/internal/db"
@@ -190,15 +189,6 @@ func (ps PollService) GetPollByWeek(season int, week int) (models.Poll, error) {
 		return models.Poll{}, errors.E(op, err, "error retrieving poll from db")
 	}
 
-	if poll.Results != nil {
-		return poll, nil
-	}
-
-	poll, err = ps.calcPollResults(poll)
-	if err != nil {
-		return models.Poll{}, errors.E(op, err, "error calculating poll results")
-	}
-
 	return poll, nil
 }
 
@@ -223,33 +213,21 @@ func (ps PollService) GetPoll(id int64) (models.Poll, error) {
 		return models.Poll{}, errors.E(op, err, "error retrieving poll from db")
 	}
 
-	if poll.Results != nil {
-		return poll, nil
-	}
-
-	poll, err = ps.calcPollResults(poll)
-	if err != nil {
-		return models.Poll{}, errors.E(op, err, "error calculating poll results")
-	}
-
 	return poll, nil
 }
 
 func (ps PollService) calcPollResults(poll models.Poll) (models.Poll, error) {
 	const op errors.Op = "app.calcPollResults"
-	log.Println("Calculating results")
+
 	// calculate and store results
 	resMap := make(map[int64]models.Result)
 
-	var ballotIds []int64
-	for _, ballot := range poll.Ballots {
-		ballotIds = append(ballotIds, ballot.ID)
-	}
-
-	ballots, err := ps.Db.GetBallotsByID(ballotIds)
+	ballots, err := ps.Db.GetBallotsByPoll(poll)
 	if err != nil {
 		return models.Poll{}, errors.E(op, err, "error retrieving ballots associated with poll")
 	}
+
+	// todo business logic to handle provisional ballots
 
 	for _, ballot := range ballots {
 		for _, vote := range ballot.Votes {
@@ -262,16 +240,18 @@ func (ps PollService) calcPollResults(poll models.Poll) (models.Poll, error) {
 		}
 	}
 
-	results := make(resultsSlice, 0, 25)
+	sortable := make(resultsSlice, 0, 25)
 	for k, v := range resMap {
 		v.TeamID = k
-		results = append(results, v)
+		sortable = append(sortable, v)
 	}
 
-	sort.Sort(results)
-	poll.Results = results
+	sort.Sort(sortable)
 
-	err = ps.Db.UpdatePoll(poll)
+	var results []models.Result
+	results = []models.Result(sortable)
+
+	err = ps.Db.UpdatePoll(poll, &results)
 	if err != nil {
 		return models.Poll{}, errors.E(op, err, "error updating poll after calculating results")
 	}

@@ -290,21 +290,119 @@ func (db *DatastoreClient) UpdateUser(user models.User) error {
 	return nil
 }
 
-func (db *DatastoreClient) AddPoll(newPoll models.Poll) (poll models.Poll, err error) {
+func (p *Poll) FromContract(c models.Poll, crs *[]models.Result) {
+	p.ID = c.ID
+	p.Season = c.Season
+	p.Week = c.Week
+	p.WeekName = c.WeekName
+	p.OpenTime = c.OpenTime
+	p.CloseTime = c.CloseTime
+	p.LastModified = c.LastModified
+
+	if crs == nil {
+		return
+	}
+
+	var rs []Result
+	for _, cr := range *crs {
+		var result Result
+		result.FromContract(cr)
+		rs = append(rs, result)
+	}
+
+	p.Results = rs
+}
+
+func (p *Poll) ToContract() (cp models.Poll, crs []models.Result) {
+	cp.ID = p.ID
+	cp.Season = p.Season
+	cp.Week = p.Week
+	cp.WeekName = p.WeekName
+	cp.OpenTime = p.OpenTime
+	cp.CloseTime = p.CloseTime
+	cp.LastModified = p.LastModified
+
+	for _, result := range p.Results {
+		crs = append(crs, models.Result{
+			TeamID:          result.TeamID,
+			TeamName:        result.TeamName,
+			TeamSlug:        result.TeamSlug,
+			Rank:            result.Rank,
+			FirstPlaceVotes: result.FirstPlaceVotes,
+			Points:          result.Points,
+		})
+	}
+
+	return cp, crs
+}
+
+type Poll struct {
+	ID           int64
+	Season       int
+	Week         int
+	WeekName     string
+	OpenTime     time.Time
+	CloseTime    time.Time
+	LastModified time.Time
+	Results      []Result
+	Ballots      []int64
+}
+
+type BallotRef struct {
+	ID              int64
+	User            string
+	PrimaryTeamSlug string
+}
+
+func (r *Result) ToContract() models.Result {
+	contract := models.Result{
+		TeamID:          r.TeamID,
+		TeamName:        r.TeamName,
+		TeamSlug:        r.TeamSlug,
+		Rank:            r.Rank,
+		FirstPlaceVotes: r.FirstPlaceVotes,
+		Points:          r.Points,
+	}
+
+	return contract
+}
+
+func (r *Result) FromContract(cr models.Result) {
+	r.TeamID = cr.TeamID
+	r.TeamName = cr.TeamName
+	r.TeamSlug = cr.TeamSlug
+	r.Rank = cr.Rank
+	r.FirstPlaceVotes = cr.FirstPlaceVotes
+	r.Points = cr.Points
+}
+
+type Result struct {
+	TeamID          int64
+	TeamName        string
+	TeamSlug        string
+	Rank            int
+	FirstPlaceVotes int
+	Points          int
+}
+
+func (db *DatastoreClient) AddPoll(newPoll models.Poll) (models.Poll, error) {
 	const op errors.Op = "datastore.AddPoll"
 	ctx := context.Background()
+	var poll Poll
+	poll.FromContract(newPoll, nil)
 
 	k := datastore.IncompleteKey("Poll", nil)
-	newPoll.LastModified = time.Now()
+	poll.LastModified = time.Now()
 
-	k, err = db.client.Put(ctx, k, &newPoll)
+	k, err := db.client.Put(ctx, k, &poll)
 	if err != nil {
 		return models.Poll{}, errors.E(op, "error on Put operation for Poll", errors.KindDatabaseError, err)
 	}
 
-	newPoll.ID = k.ID
+	poll.ID = k.ID
+	contract, _ := poll.ToContract()
 
-	return newPoll, nil
+	return contract, nil
 }
 
 func (db *DatastoreClient) GetPoll(id int64) (models.Poll, error) {
@@ -312,14 +410,15 @@ func (db *DatastoreClient) GetPoll(id int64) (models.Poll, error) {
 	ctx := context.Background()
 
 	k := datastore.IDKey("Poll", id, nil)
-	var poll models.Poll
+	var poll Poll
 	err := db.client.Get(ctx, k, &poll)
 	if err != nil {
 		return models.Poll{}, errors.E(op, errors.KindDatabaseError, "error on Get operation for poll", err)
 	}
 	poll.ID = id
+	contract, _ := poll.ToContract()
 
-	return poll, nil
+	return contract, nil
 }
 
 func (db *DatastoreClient) GetPollByWeek(season int, week int) (models.Poll, error) {
@@ -328,7 +427,7 @@ func (db *DatastoreClient) GetPollByWeek(season int, week int) (models.Poll, err
 
 	q := datastore.NewQuery("Poll").Filter("Season =", season).Filter("Week =", week)
 
-	var polls []models.Poll
+	var polls []Poll
 	ks, err := db.client.GetAll(ctx, q, &polls)
 	if err != nil {
 		return models.Poll{}, errors.E(op, "error on Get operation for Poll", errors.KindDatabaseError, err)
@@ -344,11 +443,12 @@ func (db *DatastoreClient) GetPollByWeek(season int, week int) (models.Poll, err
 
 	poll := polls[0]
 	poll.ID = ks[0].ID
+	contract, _ := poll.ToContract()
 
-	return poll, nil
+	return contract, nil
 }
 
-func (db *DatastoreClient) UpdatePoll(poll models.Poll) error {
+func (db *DatastoreClient) UpdatePoll(poll models.Poll, results *[]models.Result) error {
 	const op errors.Op = "datastore.UpdatePoll"
 	ctx := context.Background()
 
@@ -374,7 +474,11 @@ func (db *DatastoreClient) UpdatePoll(poll models.Poll) error {
 	}
 
 	poll.LastModified = time.Now()
-	_, err = tx.Put(k, &poll)
+
+	var updatedPoll Poll
+	updatedPoll.FromContract(poll, results)
+
+	_, err = tx.Put(k, &updatedPoll)
 	if err != nil {
 		_ = tx.Rollback()
 		return errors.E(op, errors.KindDatabaseError, "error writing poll to db", err)
@@ -428,14 +532,14 @@ func (db *DatastoreClient) AddBallot(newBallot models.Ballot) (models.Ballot, er
 	ctx := context.Background()
 
 	// get next available ID
-	newId, err := db.nextID("Ballot")
+	newID, err := db.nextID("Ballot")
 	if err != nil {
 		return models.Ballot{}, errors.E(op, "error finding next available ID", err)
 	}
-	newBallot.ID = newId
+	newBallot.ID = newID
 
 	ballot := ballotFromContract(newBallot)
-	k := datastore.IDKey("Ballot", newId, nil)
+	k := datastore.IDKey("Ballot", newID, nil)
 
 	tx, err := db.client.NewTransaction(ctx)
 	if err != nil {
@@ -460,14 +564,14 @@ func (db *DatastoreClient) AddBallot(newBallot models.Ballot) (models.Ballot, er
 		return models.Ballot{}, errors.E(op, "error on Put operation for Ballot", errors.KindDatabaseError, err)
 	}
 
-	var poll models.Poll
+	var poll Poll
 	err = tx.Get(ballot.Poll, &poll)
 	if err != nil {
 		_ = tx.Rollback()
 		return models.Ballot{}, errors.E(op, "error retrieving poll for Ballot", errors.KindDatabaseError)
 	}
 
-	poll.Ballots = append(poll.Ballots, models.BallotRef{ID: newId, User: ballot.User.Name})
+	poll.Ballots = append(poll.Ballots, newID)
 	poll.Results = nil
 	poll.LastModified = time.Now()
 	_, err = tx.Put(ballot.Poll, &poll)
@@ -482,7 +586,7 @@ func (db *DatastoreClient) AddBallot(newBallot models.Ballot) (models.Ballot, er
 	}
 
 	k = c.Key(pk)
-	if k.ID != newId {
+	if k.ID != newID {
 		panic("keys don't match")
 	}
 
@@ -502,7 +606,7 @@ func (db *DatastoreClient) UpdateBallot(ballot models.Ballot) error {
 		return errors.E(op, "could not create transaction", errors.KindDatabaseError, err)
 	}
 
-	var poll models.Poll
+	var poll Poll
 
 	err = tx.Get(pollKey, &poll)
 	if err != nil {
@@ -544,7 +648,7 @@ func (db *DatastoreClient) DeleteBallot(id int64) error {
 		return errors.E(op, "could not create transaction", errors.KindDatabaseError, err)
 	}
 
-	var poll models.Poll
+	var poll Poll
 	var ballot Ballot
 
 	err = tx.Get(k, &ballot)
@@ -563,12 +667,13 @@ func (db *DatastoreClient) DeleteBallot(id int64) error {
 		return errors.E(op, "error retrieving poll for ballot", errors.KindDatabaseError, err)
 	}
 
-	newBallots := make([]models.BallotRef, 0, len(poll.Ballots))
+	newBallots := make([]int64, 0, len(poll.Ballots))
 	for _, ref := range poll.Ballots {
-		if ref.ID != id {
+		if ref != id {
 			newBallots = append(newBallots, ref)
 		}
 	}
+
 	poll.Ballots = newBallots
 	poll.Results = nil
 	poll.LastModified = time.Now()
@@ -602,11 +707,15 @@ func (db *DatastoreClient) GetBallot(id int64) (ballot models.Ballot, err error)
 	k := datastore.IDKey("Ballot", id, nil)
 	err = db.client.Get(ctx, k, &b)
 
-	if err == datastore.ErrNoSuchEntity {
-		err = errors.E(errors.KindNotFound, op, err)
-	} else if err != nil {
-		err = errors.E(errors.KindDatabaseError, op, err)
+	if err != nil {
+		if err == datastore.ErrNoSuchEntity {
+			err = errors.E(errors.KindNotFound, op, err)
+		} else {
+			err = errors.E(errors.KindDatabaseError, op, err)
+		}
+		return models.Ballot{}, err
 	}
+
 
 	return ballotToContract(b), nil
 }
@@ -623,6 +732,47 @@ func (db *DatastoreClient) GetBallotsByID(ids []int64) ([]models.Ballot, error) 
 	}
 
 	err := db.client.GetMulti(ctx, ks, &bs)
+	if err != nil {
+		err = errors.E(errors.KindDatabaseError, op, err, "error retrieving ballots by ID")
+		return nil, err
+	}
+
+	var contracts []models.Ballot
+
+	for _, ballot := range bs {
+		contracts = append(contracts, ballotToContract(ballot))
+	}
+
+	return contracts, nil
+}
+
+func (db *DatastoreClient) GetBallotsByPoll(poll models.Poll) ([]models.Ballot, error) {
+	const op errors.Op = "datastore.GetBallotsByPoll"
+	ctx := context.Background()
+
+	var tmp Poll
+
+	k := datastore.IDKey("Poll", poll.ID, nil)
+	err := db.client.Get(ctx, k, &tmp)
+
+	if err != nil {
+		if err == datastore.ErrNoSuchEntity {
+			err = errors.E(errors.KindNotFound, op, err)
+		} else {
+			err = errors.E(errors.KindDatabaseError, op, err, "error retrieving poll")
+		}
+		return nil, err
+	}
+
+	var ks []*datastore.Key
+
+	for _, id := range tmp.Ballots {
+		ks = append(ks, datastore.IDKey("Ballot", id, nil))
+	}
+
+	var bs []Ballot
+
+	err = db.client.GetMulti(ctx, ks, &bs)
 	if err != nil {
 		err = errors.E(errors.KindDatabaseError, op, err, "error retrieving ballots by ID")
 		return nil, err
