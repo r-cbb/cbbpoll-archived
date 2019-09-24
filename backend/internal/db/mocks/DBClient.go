@@ -306,6 +306,20 @@ func (_m *DBClient) GetUsers(filter []db.Filter, sort db.Sort) ([]models.User, e
 	return r0, r1
 }
 
+// SetResults provides a mock function with given fields: poll, results
+func (_m *DBClient) SetResults(poll models.Poll, results []models.Result) error {
+	ret := _m.Called(poll, results)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(models.Poll, []models.Result) error); ok {
+		r0 = rf(poll, results)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // UpdateBallot provides a mock function with given fields: ballot
 func (_m *DBClient) UpdateBallot(ballot models.Ballot) error {
 	ret := _m.Called(ballot)
@@ -320,13 +334,13 @@ func (_m *DBClient) UpdateBallot(ballot models.Ballot) error {
 	return r0
 }
 
-// UpdatePoll provides a mock function with given fields: poll, results
-func (_m *DBClient) UpdatePoll(poll models.Poll, results *[]models.Result) error {
-	ret := _m.Called(poll, results)
+// UpdatePoll provides a mock function with given fields: poll
+func (_m *DBClient) UpdatePoll(poll models.Poll) error {
+	ret := _m.Called(poll)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(models.Poll, *[]models.Result) error); ok {
-		r0 = rf(poll, results)
+	if rf, ok := ret.Get(0).(func(models.Poll) error); ok {
+		r0 = rf(poll)
 	} else {
 		r0 = ret.Error(0)
 	}

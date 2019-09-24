@@ -290,7 +290,7 @@ func (db *DatastoreClient) UpdateUser(user models.User) error {
 	return nil
 }
 
-func (p *Poll) FromContract(c models.Poll, crs *[]models.Result) {
+func (p *Poll) FromContract(c models.Poll) {
 	p.ID = c.ID
 	p.Season = c.Season
 	p.Week = c.Week
@@ -298,22 +298,9 @@ func (p *Poll) FromContract(c models.Poll, crs *[]models.Result) {
 	p.OpenTime = c.OpenTime
 	p.CloseTime = c.CloseTime
 	p.LastModified = c.LastModified
-
-	if crs == nil {
-		return
-	}
-
-	var rs []Result
-	for _, cr := range *crs {
-		var result Result
-		result.FromContract(cr)
-		rs = append(rs, result)
-	}
-
-	p.Results = rs
 }
 
-func (p *Poll) ToContract() (cp models.Poll, crs []models.Result) {
+func (p *Poll) ToContract() (cp models.Poll) {
 	cp.ID = p.ID
 	cp.Season = p.Season
 	cp.Week = p.Week
@@ -322,18 +309,7 @@ func (p *Poll) ToContract() (cp models.Poll, crs []models.Result) {
 	cp.CloseTime = p.CloseTime
 	cp.LastModified = p.LastModified
 
-	for _, result := range p.Results {
-		crs = append(crs, models.Result{
-			TeamID:          result.TeamID,
-			TeamName:        result.TeamName,
-			TeamSlug:        result.TeamSlug,
-			Rank:            result.Rank,
-			FirstPlaceVotes: result.FirstPlaceVotes,
-			Points:          result.Points,
-		})
-	}
-
-	return cp, crs
+	return cp
 }
 
 type Poll struct {
@@ -389,7 +365,7 @@ func (db *DatastoreClient) AddPoll(newPoll models.Poll) (models.Poll, error) {
 	const op errors.Op = "datastore.AddPoll"
 	ctx := context.Background()
 	var poll Poll
-	poll.FromContract(newPoll, nil)
+	poll.FromContract(newPoll)
 
 	k := datastore.IncompleteKey("Poll", nil)
 	poll.LastModified = time.Now()
@@ -400,7 +376,7 @@ func (db *DatastoreClient) AddPoll(newPoll models.Poll) (models.Poll, error) {
 	}
 
 	poll.ID = k.ID
-	contract, _ := poll.ToContract()
+	contract := poll.ToContract()
 
 	return contract, nil
 }
@@ -416,7 +392,7 @@ func (db *DatastoreClient) GetPoll(id int64) (models.Poll, error) {
 		return models.Poll{}, errors.E(op, errors.KindDatabaseError, "error on Get operation for poll", err)
 	}
 	poll.ID = id
-	contract, _ := poll.ToContract()
+	contract := poll.ToContract()
 
 	return contract, nil
 }
@@ -443,12 +419,12 @@ func (db *DatastoreClient) GetPollByWeek(season int, week int) (models.Poll, err
 
 	poll := polls[0]
 	poll.ID = ks[0].ID
-	contract, _ := poll.ToContract()
+	contract := poll.ToContract()
 
 	return contract, nil
 }
 
-func (db *DatastoreClient) UpdatePoll(poll models.Poll, results *[]models.Result) error {
+func (db *DatastoreClient) UpdatePoll(poll models.Poll) error {
 	const op errors.Op = "datastore.UpdatePoll"
 	ctx := context.Background()
 
@@ -458,7 +434,7 @@ func (db *DatastoreClient) UpdatePoll(poll models.Poll, results *[]models.Result
 	}
 
 	k := datastore.IDKey("Poll", poll.ID, nil)
-	var tmp models.Poll
+	var tmp Poll
 	err = tx.Get(k, &tmp)
 	if err != nil {
 		_ = tx.Rollback()
@@ -473,10 +449,12 @@ func (db *DatastoreClient) UpdatePoll(poll models.Poll, results *[]models.Result
 		return err
 	}
 
-	poll.LastModified = time.Now()
-
 	var updatedPoll Poll
-	updatedPoll.FromContract(poll, results)
+	updatedPoll.FromContract(poll)
+
+	// preserve Results
+	updatedPoll.Results = tmp.Results
+	updatedPoll.LastModified = time.Now()
 
 	_, err = tx.Put(k, &updatedPoll)
 	if err != nil {
@@ -487,6 +465,55 @@ func (db *DatastoreClient) UpdatePoll(poll models.Poll, results *[]models.Result
 	_, err = tx.Commit()
 	if err != nil {
 		return errors.E(op, errors.KindDatabaseError, "error committing transaction", err)
+	}
+
+	return nil
+}
+
+func (db *DatastoreClient) SetResults(poll models.Poll, results []models.Result) error {
+	const op errors.Op = "datastore.SetResults"
+	ctx := context.Background()
+
+	tx, err := db.client.NewTransaction(ctx)
+	if err != nil {
+		return errors.E(op, errors.KindDatabaseError, "unable to create transaction", err)
+	}
+
+	k := datastore.IDKey("Poll", poll.ID, nil)
+	var tmp Poll
+	err = tx.Get(k, &tmp)
+	if err != nil {
+		_ = tx.Rollback()
+		return errors.E(op, errors.KindDatabaseError, "unable to retrieve poll", err)
+	}
+
+	if tmp.LastModified != poll.LastModified {
+		// Poll has changed since client calculated results. Return an error
+		// to keep results consistent.
+		err = errors.E(op, errors.KindConcurrencyProblem, "poll out of date when attempting to set results")
+		_ = tx.Rollback()
+		return err
+	}
+
+	var dbResults []Result
+
+	for _, result := range results {
+		var dbResult Result
+		dbResult.FromContract(result)
+		dbResults = append(dbResults, dbResult)
+	}
+
+	tmp.Results = dbResults
+
+	_, err = tx.Put(k, &tmp)
+	if err != nil {
+		_ = tx.Rollback()
+		return errors.E(op, errors.KindDatabaseError, "error writing poll to db", err)
+	}
+
+	_, err = tx.Commit()
+	if err != nil {
+		return errors.E(op, errors.KindConcurrencyProblem, "error committing transaction", err)
 	}
 
 	return nil

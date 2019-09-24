@@ -240,18 +240,15 @@ func (ps PollService) calcPollResults(poll models.Poll) (models.Poll, error) {
 		}
 	}
 
-	sortable := make(resultsSlice, 0, 25)
+	results := make(resultsSlice, 0, 25)
 	for k, v := range resMap {
 		v.TeamID = k
-		sortable = append(sortable, v)
+		results = append(results, v)
 	}
 
-	sort.Sort(sortable)
+	sort.Sort(results)
 
-	var results []models.Result
-	results = []models.Result(sortable)
-
-	err = ps.Db.UpdatePoll(poll, &results)
+	err = ps.Db.SetResults(poll, []models.Result(results))
 	if err != nil {
 		return models.Poll{}, errors.E(op, err, "error updating poll after calculating results")
 	}

@@ -13,9 +13,10 @@ type DBClient interface {
 	GetUsers(filter []Filter, sort Sort) ([]models.User, error)
 
 	AddPoll(newPoll models.Poll) (poll models.Poll, err error)
-	UpdatePoll(poll models.Poll, results *[]models.Result) error
+	UpdatePoll(poll models.Poll) error
 	GetPoll(id int64) (poll models.Poll, err error)
 	GetPollByWeek(season int, week int) (poll models.Poll, err error)
+	SetResults(poll models.Poll, results []models.Result) error
 
 	AddBallot(newBallot models.Ballot) (ballot models.Ballot, err error)
 	GetBallot(id int64) (ballot models.Ballot, err error)
