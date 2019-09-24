@@ -39,16 +39,14 @@ type VoterEvent struct {
 }
 
 type Poll struct {
-	ID int64 `json:"id"`
-	// example: 2020
 	Season int `json:"season"`
 	// example: 3
 	Week int `json:"week"`
 	// description: used to "pretty up" polls like Preseason, Postseason, "Way-too-early", etc.  Empty otherwise.
-	WeekName     string      `json:"week_name,omitempty"`
-	OpenTime     time.Time   `json:"open_time"`
-	CloseTime    time.Time   `json:"close_time"`
-	LastModified time.Time   `json:"last_modified"`
+	WeekName     string    `json:"week_name,omitempty"`
+	OpenTime     time.Time `json:"open_time"`
+	CloseTime    time.Time `json:"close_time"`
+	LastModified time.Time `json:"last_modified"`
 }
 
 type BallotRef struct {
@@ -69,7 +67,8 @@ type Result struct {
 
 type Ballot struct {
 	ID          int64     `json:"id"`
-	Poll        int64     `json:"poll_id"`
+	PollSeason  int       `json:"poll_season"`
+	PollWeek    int       `json:"poll_week"`
 	UpdatedTime time.Time `json:"updated_time"`
 	User        string    `json:"user"`
 	Votes       []Vote    `json:"votes"`

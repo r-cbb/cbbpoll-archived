@@ -169,7 +169,7 @@ func (ps PollService) AddPoll(user models.UserToken, poll models.Poll) (models.P
 		return models.Poll{}, errors.E(op, errors.KindUnauthorized, "user doesn't have sufficient permissions to add a poll")
 	}
 
-	_, err := ps.Db.GetPollByWeek(poll.Season, poll.Week)
+	_, err := ps.Db.GetPoll(poll.Season, poll.Week)
 	if errors.Kind(err) != errors.KindNotFound {
 		return models.Poll{}, errors.E(op, errors.KindConflict, fmt.Sprintf("poll already exists for season %v week %v", poll.Season, poll.Week))
 	}
@@ -182,14 +182,36 @@ func (ps PollService) AddPoll(user models.UserToken, poll models.Poll) (models.P
 	return newPoll, nil
 }
 
-func (ps PollService) GetPollByWeek(season int, week int) (models.Poll, error) {
-	const op errors.Op = "app.GetPollByWeek"
-	poll, err := ps.Db.GetPollByWeek(season, week)
+func (ps PollService) GetPoll(season int, week int) (models.Poll, error) {
+	const op errors.Op = "app.GetPoll"
+	poll, err := ps.Db.GetPoll(season, week)
 	if err != nil {
 		return models.Poll{}, errors.E(op, err, "error retrieving poll from db")
 	}
 
 	return poll, nil
+}
+
+func (ps PollService) GetResults(season int, week int) ([]models.Result, error) {
+	const op errors.Op = "app.GetResults"
+	poll, err := ps.GetPoll(season, week)
+	if err != nil {
+		return nil, errors.E(op, err, "error retrieving poll from db")
+	}
+
+	results, err := ps.Db.GetResults(poll)
+	if err != nil {
+		return nil, errors.E(op, err, "error retrieving results for poll")
+	}
+
+	if results == nil {
+		results, err = ps.calcPollResults(poll)
+		if err != nil {
+			return nil, errors.E(op, err, "error calculating poll results")
+		}
+	}
+
+	return results, nil
 }
 
 type resultsSlice []models.Result
@@ -206,17 +228,7 @@ func (rs resultsSlice) Swap(i, j int) {
 	rs[i], rs[j] = rs[j], rs[i]
 }
 
-func (ps PollService) GetPoll(id int64) (models.Poll, error) {
-	const op errors.Op = "app.GetPoll"
-	poll, err := ps.Db.GetPoll(id)
-	if err != nil {
-		return models.Poll{}, errors.E(op, err, "error retrieving poll from db")
-	}
-
-	return poll, nil
-}
-
-func (ps PollService) calcPollResults(poll models.Poll) (models.Poll, error) {
+func (ps PollService) calcPollResults(poll models.Poll) ([]models.Result, error) {
 	const op errors.Op = "app.calcPollResults"
 
 	// calculate and store results
@@ -224,7 +236,7 @@ func (ps PollService) calcPollResults(poll models.Poll) (models.Poll, error) {
 
 	ballots, err := ps.Db.GetBallotsByPoll(poll)
 	if err != nil {
-		return models.Poll{}, errors.E(op, err, "error retrieving ballots associated with poll")
+		return nil, errors.E(op, err, "error retrieving ballots associated with poll")
 	}
 
 	// todo business logic to handle provisional ballots
@@ -248,12 +260,14 @@ func (ps PollService) calcPollResults(poll models.Poll) (models.Poll, error) {
 
 	sort.Sort(results)
 
+	// todo business logic to handle rank, team_name, team_slug
+
 	err = ps.Db.SetResults(poll, []models.Result(results))
 	if err != nil {
-		return models.Poll{}, errors.E(op, err, "error updating poll after calculating results")
+		return nil, errors.E(op, err, "error updating poll after calculating results")
 	}
 
-	return poll, nil
+	return []models.Result(results), nil
 }
 
 func (ps PollService) AddBallot(user models.UserToken, ballot models.Ballot) (models.Ballot, error) {

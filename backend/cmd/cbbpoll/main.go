@@ -33,6 +33,7 @@ func main() {
 
 	// Setup service layer
 	srv.App = app.NewPollService(datastoreClient)
+	srv.App.Admins = append(srv.App.Admins, "Concision")
 
 	// Setup JWT Auth
 	setupAuth(srv)

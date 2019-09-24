@@ -37,6 +37,8 @@ func (s *Server) Routes() {
 	s.router.HandleFunc(fmt.Sprintf("%s/polls", v1), s.handleAddPoll()).Methods(http.MethodPost)
 	s.router.HandleFunc(fmt.Sprintf("%s/polls", v1), s.handleListPolls()).Methods(http.MethodGet)
 	s.router.HandleFunc(fmt.Sprintf("%s/polls/{season:[0-9]+}/{week:[0-9]+}", v1), s.handleGetPoll()).Methods(http.MethodGet).Name("poll")
+	s.router.HandleFunc(fmt.Sprintf("%s/polls/{season:[0-9]+}/{week:[0-9]+}/results", v1), s.handleGetResults()).Methods(http.MethodGet)
+
 
 	// Ballots
 	s.router.HandleFunc(fmt.Sprintf("%s/ballots", v1), s.handleAddBallot()).Methods(http.MethodPost)
@@ -329,13 +331,15 @@ func (s *Server) handleGetPoll() http.HandlerFunc {
 		season, err := strconv.Atoi(vars["season"])
 		if err != nil {
 			s.respond(w, r, nil, http.StatusBadRequest)
+			return
 		}
 		week, err := strconv.Atoi(vars["week"])
 		if err != nil {
 			s.respond(w, r, nil, http.StatusBadRequest)
+			return
 		}
 
-		poll, err := s.App.GetPollByWeek(season, week)
+		poll, err := s.App.GetPoll(season, week)
 		if err != nil {
 			if errors.Kind(err) == errors.KindNotFound {
 				s.respond(w, r, nil, http.StatusNotFound)
@@ -347,6 +351,37 @@ func (s *Server) handleGetPoll() http.HandlerFunc {
 		}
 
 		s.respond(w, r, poll, http.StatusOK)
+		return
+	}
+}
+
+func (s *Server) handleGetResults() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		vars := mux.Vars(r)
+		season, err := strconv.Atoi(vars["season"])
+		if err != nil {
+			s.respond(w, r, nil, http.StatusBadRequest)
+			return
+		}
+		week, err := strconv.Atoi(vars["week"])
+		if err != nil {
+			s.respond(w, r, nil, http.StatusBadRequest)
+			return
+		}
+
+		results, err := s.App.GetResults(season, week)
+		if err != nil {
+			if errors.Kind(err) == errors.KindNotFound {
+				s.respond(w, r, nil, http.StatusNotFound)
+				return
+			}
+
+			log.Println(err.Error())
+			s.respond(w, r, nil, http.StatusInternalServerError)
+			return
+		}
+
+		s.respond(w, r, results, http.StatusOK)
 		return
 	}
 }

@@ -130,29 +130,6 @@ func (_m *DBClient) GetBallot(id int64) (models.Ballot, error) {
 	return r0, r1
 }
 
-// GetBallotsByID provides a mock function with given fields: ids
-func (_m *DBClient) GetBallotsByID(ids []int64) ([]models.Ballot, error) {
-	ret := _m.Called(ids)
-
-	var r0 []models.Ballot
-	if rf, ok := ret.Get(0).(func([]int64) []models.Ballot); ok {
-		r0 = rf(ids)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]models.Ballot)
-		}
-	}
-
-	var r1 error
-	if rf, ok := ret.Get(1).(func([]int64) error); ok {
-		r1 = rf(ids)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
 // GetBallotsByPoll provides a mock function with given fields: poll
 func (_m *DBClient) GetBallotsByPoll(poll models.Poll) ([]models.Ballot, error) {
 	ret := _m.Called(poll)
@@ -176,29 +153,8 @@ func (_m *DBClient) GetBallotsByPoll(poll models.Poll) ([]models.Ballot, error) 
 	return r0, r1
 }
 
-// GetPoll provides a mock function with given fields: id
-func (_m *DBClient) GetPoll(id int64) (models.Poll, error) {
-	ret := _m.Called(id)
-
-	var r0 models.Poll
-	if rf, ok := ret.Get(0).(func(int64) models.Poll); ok {
-		r0 = rf(id)
-	} else {
-		r0 = ret.Get(0).(models.Poll)
-	}
-
-	var r1 error
-	if rf, ok := ret.Get(1).(func(int64) error); ok {
-		r1 = rf(id)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// GetPollByWeek provides a mock function with given fields: season, week
-func (_m *DBClient) GetPollByWeek(season int, week int) (models.Poll, error) {
+// GetPoll provides a mock function with given fields: season, week
+func (_m *DBClient) GetPoll(season int, week int) (models.Poll, error) {
 	ret := _m.Called(season, week)
 
 	var r0 models.Poll
@@ -211,6 +167,29 @@ func (_m *DBClient) GetPollByWeek(season int, week int) (models.Poll, error) {
 	var r1 error
 	if rf, ok := ret.Get(1).(func(int, int) error); ok {
 		r1 = rf(season, week)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetResults provides a mock function with given fields: poll
+func (_m *DBClient) GetResults(poll models.Poll) ([]models.Result, error) {
+	ret := _m.Called(poll)
+
+	var r0 []models.Result
+	if rf, ok := ret.Get(0).(func(models.Poll) []models.Result); ok {
+		r0 = rf(poll)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]models.Result)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(models.Poll) error); ok {
+		r1 = rf(poll)
 	} else {
 		r1 = ret.Error(1)
 	}

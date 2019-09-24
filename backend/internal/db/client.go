@@ -14,13 +14,12 @@ type DBClient interface {
 
 	AddPoll(newPoll models.Poll) (poll models.Poll, err error)
 	UpdatePoll(poll models.Poll) error
-	GetPoll(id int64) (poll models.Poll, err error)
-	GetPollByWeek(season int, week int) (poll models.Poll, err error)
+	GetPoll(season int, week int) (poll models.Poll, err error)
 	SetResults(poll models.Poll, results []models.Result) error
+	GetResults(poll models.Poll) (results []models.Result, err error)
 
 	AddBallot(newBallot models.Ballot) (ballot models.Ballot, err error)
 	GetBallot(id int64) (ballot models.Ballot, err error)
-	GetBallotsByID(ids []int64) (ballots []models.Ballot, err error)
 	GetBallotsByPoll(poll models.Poll) (ballots []models.Ballot, err error)
 	DeleteBallot(id int64) (err error)
 	UpdateBallot(ballot models.Ballot) error
