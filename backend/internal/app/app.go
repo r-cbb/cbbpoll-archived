@@ -194,11 +194,7 @@ func (ps PollService) GetPoll(season int, week int) (models.Poll, error) {
 
 func (ps PollService) GetResults(season int, week int) ([]models.Result, error) {
 	const op errors.Op = "app.GetResults"
-	poll, err := ps.GetPoll(season, week)
-	if err != nil {
-		return nil, errors.E(op, err, "error retrieving poll from db")
-	}
-
+	poll := models.Poll{Season: season, Week: week}
 	results, err := ps.Db.GetResults(poll)
 	if err != nil {
 		return nil, errors.E(op, err, "error retrieving results for poll")
