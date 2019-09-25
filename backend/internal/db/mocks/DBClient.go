@@ -174,13 +174,13 @@ func (_m *DBClient) GetPoll(season int, week int) (models.Poll, error) {
 	return r0, r1
 }
 
-// GetResults provides a mock function with given fields: poll
-func (_m *DBClient) GetResults(poll models.Poll) ([]models.Result, error) {
-	ret := _m.Called(poll)
+// GetResults provides a mock function with given fields: poll, includeProvisional
+func (_m *DBClient) GetResults(poll models.Poll, includeProvisional bool) ([]models.Result, error) {
+	ret := _m.Called(poll, includeProvisional)
 
 	var r0 []models.Result
-	if rf, ok := ret.Get(0).(func(models.Poll) []models.Result); ok {
-		r0 = rf(poll)
+	if rf, ok := ret.Get(0).(func(models.Poll, bool) []models.Result); ok {
+		r0 = rf(poll, includeProvisional)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]models.Result)
@@ -188,8 +188,8 @@ func (_m *DBClient) GetResults(poll models.Poll) ([]models.Result, error) {
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(models.Poll) error); ok {
-		r1 = rf(poll)
+	if rf, ok := ret.Get(1).(func(models.Poll, bool) error); ok {
+		r1 = rf(poll, includeProvisional)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -285,13 +285,13 @@ func (_m *DBClient) GetUsers(filter []db.Filter, sort db.Sort) ([]models.User, e
 	return r0, r1
 }
 
-// SetResults provides a mock function with given fields: poll, results
-func (_m *DBClient) SetResults(poll models.Poll, results []models.Result) error {
-	ret := _m.Called(poll, results)
+// SetResults provides a mock function with given fields: poll, official, allBallots
+func (_m *DBClient) SetResults(poll models.Poll, official []models.Result, allBallots []models.Result) error {
+	ret := _m.Called(poll, official, allBallots)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(models.Poll, []models.Result) error); ok {
-		r0 = rf(poll, results)
+	if rf, ok := ret.Get(0).(func(models.Poll, []models.Result, []models.Result) error); ok {
+		r0 = rf(poll, official, allBallots)
 	} else {
 		r0 = ret.Error(0)
 	}

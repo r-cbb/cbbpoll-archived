@@ -153,7 +153,7 @@ func (ps PollService) UpdateUser(user models.UserToken, name string, updatedUser
 
 	err = ps.Db.UpdateUser(updatedUser)
 	if err != nil {
-		return models.User{}, errors.E(op, "error updating user in db")
+		return models.User{}, errors.E(op, "error updating user in db", err)
 	}
 
 	return updatedUser, nil
@@ -195,7 +195,7 @@ func (ps PollService) GetPoll(season int, week int) (models.Poll, error) {
 func (ps PollService) GetResults(season int, week int) ([]models.Result, error) {
 	const op errors.Op = "app.GetResults"
 	poll := models.Poll{Season: season, Week: week}
-	results, err := ps.Db.GetResults(poll)
+	results, err := ps.Db.GetResults(poll, false)
 	if err != nil {
 		return nil, errors.E(op, err, "error retrieving results for poll")
 	}
@@ -258,7 +258,7 @@ func (ps PollService) calcPollResults(poll models.Poll) ([]models.Result, error)
 
 	// todo business logic to handle rank, team_name, team_slug
 
-	err = ps.Db.SetResults(poll, []models.Result(results))
+	err = ps.Db.SetResults(poll, []models.Result(results), []models.Result{})
 	if err != nil {
 		return nil, errors.E(op, err, "error updating poll after calculating results")
 	}

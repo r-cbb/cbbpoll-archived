@@ -20,12 +20,15 @@ require (
 	github.com/rs/cors v1.7.0
 	github.com/stretchr/testify v1.4.0
 	go.opencensus.io v0.22.1 // indirect
-	golang.org/x/crypto v0.0.0-20190907121410-71b5226ff739 // indirect
+	golang.org/x/crypto v0.0.0-20190923035154-9ee001bba392 // indirect
 	golang.org/x/exp v0.0.0-20190829153037-c13cbed26979 // indirect
 	golang.org/x/image v0.0.0-20190902063713-cb417be4ba39 // indirect
+	golang.org/x/lint v0.0.0-20190909230951-414d861bb4ac // indirect
 	golang.org/x/mobile v0.0.0-20190830201351-c6da95954960 // indirect
-	golang.org/x/sys v0.0.0-20190907184412-d223b2b6db03 // indirect
-	golang.org/x/tools v0.0.0-20190907020128-2ca718005c18 // indirect
+	golang.org/x/net v0.0.0-20190923162816-aa69164e4478 // indirect
+	golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e // indirect
+	golang.org/x/sys v0.0.0-20190924135425-2f72d4f06240 // indirect
+	golang.org/x/tools v0.0.0-20190924052046-3ac2a5bbd98a // indirect
 	google.golang.org/api v0.10.0
 	google.golang.org/appengine v1.6.2 // indirect
 	google.golang.org/genproto v0.0.0-20190905072037-92dd089d5514 // indirect

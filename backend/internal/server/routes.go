@@ -264,6 +264,7 @@ func (s *Server) handleUpdateUser() http.HandlerFunc {
 
 		updatedUser, err := s.App.UpdateUser(token, name, user)
 		if err != nil {
+			log.Println(err.Error())
 			switch errors.Kind(err) {
 			case errors.KindUnauthenticated:
 				s.respond(w, r, nil, http.StatusUnauthorized)
@@ -276,6 +277,9 @@ func (s *Server) handleUpdateUser() http.HandlerFunc {
 				return
 			case errors.KindBadRequest:
 				s.respond(w, r, nil, http.StatusBadRequest)
+				return
+			default:
+				s.respond(w, r, nil, http.StatusInternalServerError)
 				return
 			}
 		}

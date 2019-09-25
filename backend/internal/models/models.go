@@ -47,6 +47,7 @@ type Poll struct {
 	OpenTime     time.Time `json:"open_time"`
 	CloseTime    time.Time `json:"close_time"`
 	LastModified time.Time `json:"last_modified"`
+	RedditURL    string    `json:"reddit_url"`
 }
 
 type BallotRef struct {

@@ -53,23 +53,23 @@ var testUser = models.User{
 	VoterEvents: nil,
 }
 
-func addTeamMockDb() mocks.DBClient {
+func addTeamMockDb() *mocks.DBClient {
 	myMock := mocks.DBClient{}
 	myMock.On("AddTeam", inputTeam).Return(testArizona, nil).Once()
-	return myMock
+	return &myMock
 }
 
-func addTeamDbError() mocks.DBClient {
+func addTeamDbError() *mocks.DBClient {
 	myMock := mocks.DBClient{}
 	myMock.On("AddTeam", inputTeam).Return(models.Team{}, fmt.Errorf("some error")).Once()
-	return myMock
+	return &myMock
 }
 
-func addTeamConcurrencyError() mocks.DBClient {
+func addTeamConcurrencyError() *mocks.DBClient {
 	myMock := mocks.DBClient{}
 	myMock.On("AddTeam", inputTeam).Return(models.Team{}, errors.E(errors.KindConcurrencyProblem, fmt.Errorf("some error"))).Once()
 	myMock.On("AddTeam", inputTeam).Return(testArizona, nil).Once()
-	return myMock
+	return &myMock
 }
 
 func TestAddTeam(t *testing.T) {
@@ -83,7 +83,7 @@ func TestAddTeam(t *testing.T) {
 		input          interface{}
 		expectedStatus int
 		expectedBody   string
-		mockDb         mocks.DBClient
+		mockDb         *mocks.DBClient
 		authClient     authMocks.AuthClient
 	}{
 		{
@@ -118,7 +118,7 @@ func TestAddTeam(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			srv := NewServer()
-			db := &test.mockDb
+			db := test.mockDb
 			srv.App = app.NewPollService(db)
 			srv.AuthClient = &test.authClient
 
@@ -137,7 +137,9 @@ func TestAddTeam(t *testing.T) {
 				return
 			}
 
-			test.mockDb.AssertExpectations(t)
+			if test.mockDb != nil {
+				test.mockDb.AssertExpectations(t)
+			}
 
 			return
 		})

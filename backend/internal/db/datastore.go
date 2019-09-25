@@ -202,21 +202,6 @@ func (db *DatastoreClient) GetUsers(filters []Filter, sort Sort) ([]models.User,
 	return users, nil
 }
 
-func filterAndSort(q *datastore.Query, filters []Filter, sort Sort) *datastore.Query {
-	for _, filter := range filters {
-		q = q.Filter(fmt.Sprintf("%s %s", filter.Field, filter.Operator), filter.Value)
-	}
-	if sort.field != "" {
-		sortStr := sort.field
-		if !sort.asc {
-			sortStr = "-" + sortStr
-		}
-
-		q = q.Order(sortStr)
-	}
-	return q
-}
-
 func (db *DatastoreClient) AddUser(user models.User) (models.User, error) {
 	const op errors.Op = "datastore.AddUser"
 	ctx := context.Background()
@@ -271,16 +256,39 @@ func (db *DatastoreClient) UpdateUser(user models.User) error {
 	k := datastore.NameKey("User", user.Nickname, nil)
 	err = tx.Get(k, &oldUser)
 	if err != nil {
+		_ = tx.Rollback()
 		return errors.E(op, "user not found to update", errors.KindNotFound, err)
 	}
 
 	user.VoterEvents = oldUser.VoterEvents
 	if user.IsVoter != oldUser.IsVoter {
-		user.VoterEvents = append([]models.VoterEvent{{user.IsVoter, time.Now()}}, oldUser.VoterEvents...)
+		user.VoterEvents = append([]models.VoterEvent{{IsVoter: user.IsVoter, EffectiveTime: time.Now()}}, oldUser.VoterEvents...)
+
+		// Adjust future polls
+		polls, err := db.futurePolls()
+		if err != nil {
+			_ = tx.Rollback()
+			return errors.E(err, op, errors.KindDatabaseError, "error retrieving polls to adjust for voter change")
+		}
+
+		for _, poll := range polls {
+			if user.IsVoter {
+				poll.MissingVoters = addIfNotExists(poll.MissingVoters, user.Nickname)
+			} else {
+				poll.MissingVoters = removeIfExists(poll.MissingVoters, user.Nickname)
+			}
+			pollKey := poll.ToKey()
+			_, err = tx.Put(pollKey, &poll)
+			if err != nil {
+				_ = tx.Rollback()
+				return errors.E(err, op, errors.KindDatabaseError, "error adding or removing user as voter for future poll")
+			}
+		}
 	}
 
 	_, err = tx.Put(k, &user)
 	if err != nil {
+		_ = tx.Rollback()
 		return errors.E(op, "error updating user", errors.KindDatabaseError, err)
 	}
 
@@ -321,20 +329,17 @@ func pollKeyFromWeek(season, week int) *datastore.Key {
 }
 
 type Poll struct {
-	Season       int
-	Week         int
-	WeekName     string
-	OpenTime     time.Time
-	CloseTime    time.Time
-	LastModified time.Time
-	Results      []Result
-	Ballots      []int64
-}
-
-type BallotRef struct {
-	ID              int64
-	User            string
-	PrimaryTeamSlug string
+	Season            int
+	Week              int
+	WeekName          string
+	OpenTime          time.Time
+	CloseTime         time.Time
+	LastModified      time.Time
+	RedditURL         string
+	Results           []Result
+	UnofficialResults []Result
+	Ballots           []int64
+	MissingVoters     []string
 }
 
 func (r *Result) ToContract() models.Result {
@@ -368,6 +373,7 @@ type Result struct {
 	Points          int
 }
 
+// todo check for existing poll inside transaction
 func (db *DatastoreClient) AddPoll(newPoll models.Poll) (models.Poll, error) {
 	const op errors.Op = "datastore.AddPoll"
 	ctx := context.Background()
@@ -376,8 +382,13 @@ func (db *DatastoreClient) AddPoll(newPoll models.Poll) (models.Poll, error) {
 
 	k := poll.ToKey()
 	poll.LastModified = time.Now()
+	currVoters, err := db.allVoters()
+	if err != nil {
+		return models.Poll{}, errors.E(op, err, "error retrieving voter list")
+	}
+	poll.MissingVoters = currVoters
 
-	k, err := db.client.Put(ctx, k, &poll)
+	k, err = db.client.Put(ctx, k, &poll)
 	if err != nil {
 		return models.Poll{}, errors.E(op, "error on Put operation for Poll", errors.KindDatabaseError, err)
 	}
@@ -435,12 +446,10 @@ func (db *DatastoreClient) UpdatePoll(poll models.Poll) error {
 		return err
 	}
 
-	// preserve Results & Ballots
-	updatedPoll.Results = storedPoll.Results
-	updatedPoll.Ballots = storedPoll.Ballots
-	updatedPoll.LastModified = time.Now()
+	// Update poll fields from param value
+	storedPoll.FromContract(poll)
 
-	_, err = tx.Put(k, &updatedPoll)
+	_, err = tx.Put(k, &storedPoll)
 	if err != nil {
 		_ = tx.Rollback()
 		return errors.E(op, errors.KindDatabaseError, "error writing poll to db", err)
@@ -454,7 +463,7 @@ func (db *DatastoreClient) UpdatePoll(poll models.Poll) error {
 	return nil
 }
 
-func (db *DatastoreClient) SetResults(poll models.Poll, results []models.Result) error {
+func (db *DatastoreClient) SetResults(poll models.Poll, official []models.Result, allBallots []models.Result) error {
 	const op errors.Op = "datastore.SetResults"
 	ctx := context.Background()
 
@@ -484,13 +493,20 @@ func (db *DatastoreClient) SetResults(poll models.Poll, results []models.Result)
 
 	var dbResults []Result
 
-	for _, result := range results {
+	for _, result := range official {
 		var dbResult Result
 		dbResult.FromContract(result)
 		dbResults = append(dbResults, dbResult)
 	}
-
 	dbPoll.Results = dbResults
+
+	dbResults = nil
+	for _, result := range allBallots {
+		var dbResult Result
+		dbResult.FromContract(result)
+		dbResults = append(dbResults, dbResult)
+	}
+	dbPoll.UnofficialResults = dbResults
 
 	_, err = tx.Put(k, &dbPoll)
 	if err != nil {
@@ -506,7 +522,7 @@ func (db *DatastoreClient) SetResults(poll models.Poll, results []models.Result)
 	return nil
 }
 
-func (db *DatastoreClient) GetResults(poll models.Poll) ([]models.Result, error) {
+func (db *DatastoreClient) GetResults(poll models.Poll, includeProvisional bool) ([]models.Result, error) {
 	const op errors.Op = "datastore.GetResults"
 	ctx := context.Background()
 
@@ -522,14 +538,19 @@ func (db *DatastoreClient) GetResults(poll models.Poll) ([]models.Result, error)
 		return nil, errors.E(op, errors.KindDatabaseError, "error retrieving Poll from db", err)
 	}
 
-	dbResults := dbPoll.Results
-	var results []models.Result
-
-	for _, dbResult := range dbResults {
-		results = append(results, dbResult.ToContract())
+	var dbResults []Result
+	if includeProvisional {
+		dbResults = dbPoll.UnofficialResults
+	} else {
+		dbResults = dbPoll.Results
 	}
 
-	return results, nil
+	var contracts []models.Result
+	for _, dbResult := range dbResults {
+		contracts = append(contracts, dbResult.ToContract())
+	}
+
+	return contracts, nil
 }
 
 type Ballot struct {
@@ -609,7 +630,7 @@ func (db *DatastoreClient) AddBallot(newBallot models.Ballot) (models.Ballot, er
 	err = tx.Get(k, &tmp)
 	if err == nil || err != datastore.ErrNoSuchEntity {
 		if err == nil {
-			err = fmt.Errorf("Datastore 'Get or Put' failed")
+			err = fmt.Errorf("datastore 'Get or Put' failed")
 		}
 		_ = tx.Rollback()
 		return models.Ballot{}, errors.E(op, "concurrency error adding Ballot", errors.KindConcurrencyProblem, err)
@@ -628,9 +649,15 @@ func (db *DatastoreClient) AddBallot(newBallot models.Ballot) (models.Ballot, er
 		return models.Ballot{}, errors.E(op, "error retrieving poll for Ballot", errors.KindDatabaseError)
 	}
 
+	// Add ballot to Poll's list of ballots, clear all results
 	poll.Ballots = append(poll.Ballots, newID)
 	poll.Results = nil
+	poll.UnofficialResults = nil
+
+	// Remove the user from the list of missing voters if they are there
+	poll.MissingVoters = removeIfExists(poll.MissingVoters, newBallot.User)
 	poll.LastModified = time.Now()
+
 	_, err = tx.Put(ballot.Poll, &poll)
 	if err != nil {
 		_ = tx.Rollback()
@@ -639,7 +666,7 @@ func (db *DatastoreClient) AddBallot(newBallot models.Ballot) (models.Ballot, er
 
 	c, err := tx.Commit()
 	if err != nil {
-		return models.Ballot{}, errors.E(op, "error committing transaction", errors.KindDatabaseError, err)
+		return models.Ballot{}, errors.E(op, "error committing transaction", errors.KindConcurrencyProblem, err)
 	}
 
 	k = c.Key(pk)
@@ -707,6 +734,7 @@ func (db *DatastoreClient) DeleteBallot(id int64) error {
 
 	var poll Poll
 	var ballot Ballot
+	var user models.User
 
 	err = tx.Get(k, &ballot)
 	if err != nil {
@@ -734,6 +762,20 @@ func (db *DatastoreClient) DeleteBallot(id int64) error {
 	poll.Ballots = newBallots
 	poll.Results = nil
 	poll.LastModified = time.Now()
+
+	userKey := ballot.User
+	err = tx.Get(userKey, &user)
+	if err != nil && err != datastore.ErrNoSuchEntity {
+		// if user doesn't exist we'll best effort delete this ballot--don't want unremovable ballots in
+		// the case we need to delete a user from the system
+		_ = tx.Rollback()
+		return errors.E(op, "error retrieving user for ballot", errors.KindDatabaseError, err)
+	}
+
+	// If user is a voter we need to add them to the poll's list of missing voters
+	if user.IsVoter {
+		poll.MissingVoters = addIfNotExists(poll.MissingVoters, user.Nickname)
+	}
 
 	_, err = tx.Put(pollKey, &poll)
 	if err != nil {
@@ -816,4 +858,92 @@ func (db *DatastoreClient) GetBallotsByPoll(poll models.Poll) ([]models.Ballot, 
 	}
 
 	return contracts, nil
+}
+
+// Helpers
+
+func filterAndSort(q *datastore.Query, filters []Filter, sort Sort) *datastore.Query {
+	for _, filter := range filters {
+		q = q.Filter(fmt.Sprintf("%s %s", filter.Field, filter.Operator), filter.Value)
+	}
+	if sort.field != "" {
+		sortStr := sort.field
+		if !sort.asc {
+			sortStr = "-" + sortStr
+		}
+
+		q = q.Order(sortStr)
+	}
+	return q
+}
+
+func (db *DatastoreClient) allVoters() ([]string, error) {
+	const op errors.Op = "datastore.allVoters"
+	ctx := context.Background()
+
+	q := datastore.NewQuery("User").Filter("IsVoter =", true)
+
+	var users []models.User
+	_, err := db.client.GetAll(ctx, q, &users)
+	if err != nil {
+		return nil, errors.E(op, err, errors.KindDatabaseError, "error getting Users")
+	}
+
+	// If there are no results, return an empty list instead of nil
+	if users == nil {
+		users = []models.User{}
+	}
+
+	var nicknames []string
+	for _, user := range users {
+		nicknames = append(nicknames, user.Nickname)
+	}
+
+	return nicknames, nil
+}
+
+func (db *DatastoreClient) futurePolls() ([]Poll, error) {
+	const op errors.Op = "datastore.futurePolls"
+	ctx := context.Background()
+
+	q := datastore.NewQuery("Poll").Filter("CloseTime >", time.Now())
+
+	var polls []Poll
+	_, err := db.client.GetAll(ctx, q, &polls)
+	if err != nil {
+		return nil, errors.E(op, err, errors.KindDatabaseError, "error getting polls closing in future")
+	}
+
+	if polls == nil {
+		polls = []Poll{}
+	}
+
+	return polls, nil
+}
+
+func removeIfExists(haystack []string, needle string) []string {
+	var result []string
+	for _, str := range haystack {
+		if needle != str {
+			result = append(result, str)
+		}
+	}
+
+	return result
+}
+
+func addIfNotExists(haystack []string, needle string) []string {
+	found := false
+	for _, str := range haystack {
+		if needle == str {
+			found = true
+			break
+		}
+	}
+
+	if found {
+		return haystack
+	}
+
+	return append(haystack, needle)
 }

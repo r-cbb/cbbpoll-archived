@@ -22,3 +22,6 @@ docker:
 
 run:
 	docker-compose up cbbpoll
+
+vet:
+	go vet ./...
