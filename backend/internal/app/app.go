@@ -2,12 +2,14 @@ package app
 
 import (
 	"fmt"
-	"sort"
+	"time"
 
 	"github.com/r-cbb/cbbpoll/internal/db"
 	"github.com/r-cbb/cbbpoll/internal/errors"
 	"github.com/r-cbb/cbbpoll/internal/models"
 )
+
+var numRanks = 5
 
 type PollService struct {
 	Db     db.DBClient
@@ -192,9 +194,18 @@ func (ps PollService) GetPoll(season int, week int) (models.Poll, error) {
 	return poll, nil
 }
 
-func (ps PollService) GetResults(season int, week int) ([]models.Result, error) {
+func (ps PollService) GetResults(user models.UserToken, season int, week int) ([]models.Result, error) {
 	const op errors.Op = "app.GetResults"
-	poll := models.Poll{Season: season, Week: week}
+
+	poll, err := ps.Db.GetPoll(season, week)
+	if err != nil {
+		return nil, errors.E(op, err, "error retrieving poll from db")
+	}
+
+	if poll.CloseTime.After(time.Now()) && !user.CanManagePolls() {
+		return nil, errors.E(op, err, "can't view poll results until after poll close", errors.KindUnauthorized)
+	}
+
 	results, err := ps.Db.GetResults(poll, false)
 	if err != nil {
 		return nil, errors.E(op, err, "error retrieving results for poll")
@@ -210,71 +221,28 @@ func (ps PollService) GetResults(season int, week int) ([]models.Result, error) 
 	return results, nil
 }
 
-type resultsSlice []models.Result
-
-func (rs resultsSlice) Len() int {
-	return len(rs)
-}
-
-func (rs resultsSlice) Less(i, j int) bool {
-	return rs[i].Points > rs[j].Points
-}
-
-func (rs resultsSlice) Swap(i, j int) {
-	rs[i], rs[j] = rs[j], rs[i]
-}
-
-func (ps PollService) calcPollResults(poll models.Poll) ([]models.Result, error) {
-	const op errors.Op = "app.calcPollResults"
-
-	// calculate and store results
-	resMap := make(map[int64]models.Result)
-
-	ballots, err := ps.Db.GetBallotsByPoll(poll)
-	if err != nil {
-		return nil, errors.E(op, err, "error retrieving ballots associated with poll")
-	}
-
-	// todo business logic to handle provisional ballots
-
-	for _, ballot := range ballots {
-		for _, vote := range ballot.Votes {
-			res := resMap[vote.TeamID]
-			if vote.Rank == 1 {
-				res.FirstPlaceVotes = res.FirstPlaceVotes + 1
-			}
-			res.Points = res.Points + 26 - vote.Rank
-			resMap[vote.TeamID] = res
-		}
-	}
-
-	results := make(resultsSlice, 0, 25)
-	for k, v := range resMap {
-		v.TeamID = k
-		results = append(results, v)
-	}
-
-	sort.Sort(results)
-
-	// todo business logic to handle rank, team_name, team_slug
-
-	err = ps.Db.SetResults(poll, []models.Result(results), []models.Result{})
-	if err != nil {
-		return nil, errors.E(op, err, "error updating poll after calculating results")
-	}
-
-	return []models.Result(results), nil
-}
-
 func (ps PollService) AddBallot(user models.UserToken, ballot models.Ballot) (models.Ballot, error) {
 	const op errors.Op = "app.AddBallot"
 	if !user.LoggedIn() {
 		return models.Ballot{}, errors.E(op, errors.KindUnauthenticated)
 	}
 
-	// Todo handle voter status
+	u, err := ps.Db.GetUser(ballot.User)
+	if err != nil {
+		return models.Ballot{}, errors.E(op, err, errors.KindBadRequest, "user doesn't exist")
+	}
 
-	// todo Validate ballot
+	if u.Nickname != user.Nickname && !user.IsAdmin {
+		return models.Ballot{}, errors.E(op, errors.KindUnauthorized, "can't submit ballot for another user")
+	}
+
+	ballot.IsOfficial = u.IsVoter
+	ballot.UpdatedTime = time.Now()
+
+	err = validateBallot(ballot)
+	if err != nil {
+		return models.Ballot{}, errors.E(op, err, "ballot failed validation", errors.KindBadRequest)
+	}
 
 	newBallot, err := ps.Db.AddBallot(ballot)
 	if err != nil {
@@ -282,6 +250,50 @@ func (ps PollService) AddBallot(user models.UserToken, ballot models.Ballot) (mo
 	}
 
 	return newBallot, nil
+}
+
+func validateBallot(b models.Ballot) error {
+	vs := b.Votes
+
+	if len(vs) != numRanks {
+		return errors.E(fmt.Errorf("ballots must contain exactly %v votes", numRanks))
+	}
+
+	if containsDuplicates(vs) {
+		return errors.E(fmt.Errorf("ballot contains duplicate votes"))
+	}
+
+	if err := checkVotes(vs); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func containsDuplicates(vs []models.Vote) bool {
+	seen := make(map[int64]struct{})
+	for _, v := range vs {
+		_, ok := seen[v.TeamID]
+		if ok {
+			return true
+		}
+		seen[v.TeamID] = struct{}{}
+	}
+	return false
+}
+
+func checkVotes(vs []models.Vote) error {
+	for _, v := range vs {
+		if v.TeamID == 0 || v.Rank == 0 {
+			return fmt.Errorf("no votes can have a team_id or rank of 0")
+		}
+
+		if len(v.Reason) > 140 {
+			return fmt.Errorf("reasons can't be longer than 140 characters")
+		}
+	}
+
+	return nil
 }
 
 func (ps PollService) DeleteBallot(user models.UserToken, id int64) error {
@@ -299,6 +311,15 @@ func (ps PollService) DeleteBallot(user models.UserToken, id int64) error {
 		return errors.E(op, errors.KindUnauthorized, "can't delete someone else's ballot")
 	}
 
+	poll, err := ps.Db.GetPoll(ballot.PollSeason, ballot.PollWeek)
+	if err != nil {
+		return errors.E(op, "error getting poll for ballot")
+	}
+
+	if poll.CloseTime.Before(time.Now()) && !user.IsAdmin {
+		return errors.E(op, errors.KindBadRequest, "can't delete a ballot for a closed poll")
+	}
+
 	err = ps.Db.DeleteBallot(id)
 	if err != nil {
 		return errors.E(op, err, "error deleting ballot")
@@ -310,11 +331,18 @@ func (ps PollService) DeleteBallot(user models.UserToken, id int64) error {
 func (ps PollService) GetBallotById(user models.UserToken, id int64) (models.Ballot, error) {
 	const op errors.Op = "app.GetBallotById"
 
-	// todo handle permission to view this ballot
-
 	ballot, err := ps.Db.GetBallot(id)
 	if err != nil {
 		return models.Ballot{}, errors.E(op, err, "error retrieving ballot from DB")
+	}
+
+	poll, err := ps.Db.GetPoll(ballot.PollSeason, ballot.PollWeek)
+	if err != nil {
+		return models.Ballot{}, errors.E(op, err, "error retrieving poll for ballot")
+	}
+
+	if poll.CloseTime.After(time.Now()) && !user.IsAdmin && ballot.User != user.Nickname {
+		return models.Ballot{}, errors.E(op, err, "users can't see other's ballots until the poll closes", errors.KindUnauthorized)
 	}
 
 	return ballot, nil

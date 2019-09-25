@@ -6,6 +6,7 @@ type DBClient interface {
 	AddTeam(newTeam models.Team) (team models.Team, err error)
 	GetTeam(id int64) (team models.Team, err error)
 	GetTeams() (teams []models.Team, err error)
+	GetTeamsByID(ids []int64) (teams []models.Team, err error)
 
 	AddUser(newUser models.User) (user models.User, err error)
 	UpdateUser(user models.User) (err error)

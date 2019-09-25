@@ -361,6 +361,7 @@ func (s *Server) handleGetPoll() http.HandlerFunc {
 
 func (s *Server) handleGetResults() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		token := s.AuthClient.UserTokenFromCtx(r.Context())
 		vars := mux.Vars(r)
 		season, err := strconv.Atoi(vars["season"])
 		if err != nil {
@@ -373,7 +374,7 @@ func (s *Server) handleGetResults() http.HandlerFunc {
 			return
 		}
 
-		results, err := s.App.GetResults(season, week)
+		results, err := s.App.GetResults(token, season, week)
 		if err != nil {
 			if errors.Kind(err) == errors.KindNotFound {
 				s.respond(w, r, nil, http.StatusNotFound)

@@ -165,6 +165,24 @@ func (db *DatastoreClient) GetTeams() (teams []models.Team, err error) {
 	return
 }
 
+func (db *DatastoreClient) GetTeamsByID(ids []int64) ([]models.Team, error) {
+	const op errors.Op = "datastore.GetTeamsByID"
+	ctx := context.Background()
+
+	ks := make([]*datastore.Key, len(ids))
+	for i := range ids {
+		ks[i] = datastore.IDKey("Team", ids[i], nil)
+	}
+
+	teams := make([]models.Team, len(ks))
+	err := db.client.GetMulti(ctx, ks, teams)
+	if err != nil {
+		return nil, errors.E(op, err, errors.KindDatabaseError, "error getting Teams from IDs")
+	}
+
+	return teams, nil
+}
+
 func (db *DatastoreClient) GetUser(name string) (user models.User, err error) {
 	const op errors.Op = "datastore.GetUser"
 	ctx := context.Background()
