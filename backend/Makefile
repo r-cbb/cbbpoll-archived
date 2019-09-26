@@ -1,3 +1,5 @@
+checks: test vet
+
 check-swagger:
 	which swagger || (go get -u github.com/go-swagger/go-swagger/cmd/swagger)
 
@@ -7,6 +9,9 @@ swagger: check-swagger
 
 test:
 	go test ./... -coverprofile=coverage.out
+
+vet:
+	go vet ./...
 
 clean:
 	rm coverage.out
