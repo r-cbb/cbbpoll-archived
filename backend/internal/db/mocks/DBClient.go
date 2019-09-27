@@ -241,6 +241,29 @@ func (_m *DBClient) GetTeams() ([]models.Team, error) {
 	return r0, r1
 }
 
+// GetTeamsByID provides a mock function with given fields: ids
+func (_m *DBClient) GetTeamsByID(ids []int64) ([]models.Team, error) {
+	ret := _m.Called(ids)
+
+	var r0 []models.Team
+	if rf, ok := ret.Get(0).(func([]int64) []models.Team); ok {
+		r0 = rf(ids)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]models.Team)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func([]int64) error); ok {
+		r1 = rf(ids)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetUser provides a mock function with given fields: name
 func (_m *DBClient) GetUser(name string) (models.User, error) {
 	ret := _m.Called(name)

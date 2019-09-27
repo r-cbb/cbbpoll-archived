@@ -84,7 +84,7 @@ func TestAddTeam(t *testing.T) {
 		expectedStatus int
 		expectedBody   string
 		mockDb         *mocks.DBClient
-		authClient     authMocks.AuthClient
+		authClient     *authMocks.AuthClient
 	}{
 		{
 			name:           "Successful add",
@@ -120,7 +120,7 @@ func TestAddTeam(t *testing.T) {
 			srv := NewServer()
 			db := test.mockDb
 			srv.App = app.NewPollService(db)
-			srv.AuthClient = &test.authClient
+			srv.AuthClient = test.authClient
 
 			var buf bytes.Buffer
 			err := json.NewEncoder(&buf).Encode(test.input)
@@ -169,17 +169,17 @@ func TestPing(t *testing.T) {
 }
 
 func TestGetMe(t *testing.T) {
-	getDb := func(nick string, user models.User, err error) mocks.DBClient {
+	getDb := func(nick string, user models.User, err error) *mocks.DBClient {
 		myMock := mocks.DBClient{}
 		myMock.On("GetUser", nick).Return(user, err)
-		return myMock
+		return &myMock
 	}
 
 	tests := []struct {
 		name           string
 		expectedStatus int
-		mockDb         mocks.DBClient
-		authClient     authMocks.AuthClient
+		mockDb         *mocks.DBClient
+		authClient     *authMocks.AuthClient
 	}{
 		{
 			name:           "Success",
@@ -203,9 +203,9 @@ func TestGetMe(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			srv := NewServer()
-			db := &test.mockDb
+			db := test.mockDb
 			srv.App = app.NewPollService(db)
-			srv.AuthClient = &test.authClient
+			srv.AuthClient = test.authClient
 
 			r := httptest.NewRequest(http.MethodGet, "/v1/users/me", nil)
 			w := httptest.NewRecorder()
@@ -219,16 +219,16 @@ func TestGetMe(t *testing.T) {
 }
 
 func TestGetTeam(t *testing.T) {
-	getDb := func(id int64, team models.Team, err error) mocks.DBClient {
+	getDb := func(id int64, team models.Team, err error) *mocks.DBClient {
 		myMock := mocks.DBClient{}
 		myMock.On("GetTeam", id).Return(team, err)
-		return myMock
+		return &myMock
 	}
 
 	tests := []struct {
 		name           string
 		expectedStatus int
-		mockDb         mocks.DBClient
+		mockDb         *mocks.DBClient
 	}{
 		{
 			name:           "Success",
@@ -250,7 +250,7 @@ func TestGetTeam(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			srv := NewServer()
-			db := &test.mockDb
+			db := test.mockDb
 			srv.App = app.NewPollService(db)
 
 			r := httptest.NewRequest(http.MethodGet, "/v1/teams/1", nil)
@@ -279,16 +279,16 @@ func TestGetTeam(t *testing.T) {
 }
 
 func TestListTeams(t *testing.T) {
-	getDb := func(teams []models.Team, err error) mocks.DBClient {
+	getDb := func(teams []models.Team, err error) *mocks.DBClient {
 		myMock := mocks.DBClient{}
 		myMock.On("GetTeams").Return(teams, err)
-		return myMock
+		return &myMock
 	}
 
 	tests := []struct {
 		name           string
 		expectedStatus int
-		mockDb         mocks.DBClient
+		mockDb         *mocks.DBClient
 		expectedTeams  []models.Team
 	}{
 		{
@@ -318,7 +318,7 @@ func TestListTeams(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			srv := NewServer()
-			db := &test.mockDb
+			db := test.mockDb
 			srv.App = app.NewPollService(db)
 
 			r := httptest.NewRequest(http.MethodGet, "/v1/teams", nil)
@@ -346,16 +346,16 @@ func TestListTeams(t *testing.T) {
 }
 
 func TestGetUser(t *testing.T) {
-	getDb := func(nick string, user models.User, err error) mocks.DBClient {
+	getDb := func(nick string, user models.User, err error) *mocks.DBClient {
 		myMock := mocks.DBClient{}
 		myMock.On("GetUser", nick).Return(user, err)
-		return myMock
+		return &myMock
 	}
 
 	tests := []struct {
 		name           string
 		expectedStatus int
-		mockDb         mocks.DBClient
+		mockDb         *mocks.DBClient
 		expectedUser   models.User
 	}{
 		{
@@ -379,7 +379,7 @@ func TestGetUser(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			srv := NewServer()
-			db := &test.mockDb
+			db := test.mockDb
 			srv.App = app.NewPollService(db)
 
 			r := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/v1/users/%s", testUser.Nickname), nil)
@@ -431,27 +431,27 @@ func TestNewSession(t *testing.T) {
 	const redditToken = "some.reddit.token"
 	const expectedToken = "some.token.value"
 
-	getDb := func(nick string, user models.User, err error, err2 error) mocks.DBClient {
+	getDb := func(nick string, user models.User, err error, err2 error) *mocks.DBClient {
 		myMock := mocks.DBClient{}
 		myMock.On("GetUser", nick).Return(user, err)
 		myMock.On("AddUser", mock.AnythingOfType("models.User")).Return(user, err2)
-		return myMock
+		return &myMock
 	}
 
-	getAuth := func(token string, err error) authMocks.AuthClient {
+	getAuth := func(token string, err error) *authMocks.AuthClient {
 		myMock := authMocks.AuthClient{}
 		myMock.On("CreateJWT", testUser).Return(token, err)
 		myMock.On("Verifier").Return(func(next http.Handler) http.Handler {
 			return http.Handler(next)
 		})
-		return myMock
+		return &myMock
 	}
 
 	tests := []struct {
 		name           string
 		expectedStatus int
-		mockDb         mocks.DBClient
-		mockAuth       authMocks.AuthClient
+		mockDb         *mocks.DBClient
+		mockAuth       *authMocks.AuthClient
 		redditClient   mockRedditClient
 		redditToken    string
 	}{
@@ -500,10 +500,10 @@ func TestNewSession(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			srv := NewServer()
-			db := &test.mockDb
+			db := test.mockDb
 			srv.App = app.NewPollService(db)
 			srv.RedditClient = test.redditClient
-			srv.AuthClient = &test.mockAuth
+			srv.AuthClient = test.mockAuth
 			srv.AuthRoutes()
 
 			r := httptest.NewRequest(http.MethodPost, "/v1/sessions", nil)
@@ -523,10 +523,10 @@ func TestNewSession(t *testing.T) {
 
 // Helpers
 
-func getAuth(token models.UserToken) authMocks.AuthClient {
+func getAuth(token models.UserToken) *authMocks.AuthClient {
 	myMock := authMocks.AuthClient{}
 	myMock.On("UserTokenFromCtx", mock.Anything).Return(token)
-	return myMock
+	return &myMock
 }
 
 func testSuccess(status int) bool {
