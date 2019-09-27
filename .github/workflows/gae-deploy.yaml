@@ -5,38 +5,26 @@ on:
 name: Deploy to Google App Engine
 
 jobs:
-  checkout-source:
+  deploy:
+    name: Deploy to Google App Engine
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@master
+      - runs-on: ubuntu-latest
+        steps:
+          - uses: actions/checkout@master
 
-  create-priv-key:
-    needs: checkout-source
-    runs-on: ubuntu-latest
-    steps:
       - name: Make private key file
         uses: jdharms/create-file@master
         with:
           file_contents: ${{ secrets.JWT_PRIV_KEY }}
           file_name: 'backend/jwtRS256.key'
 
-  create-pub-key:
-    needs: checkout-source
-    runs-on: ubuntu-latest
-    steps:
       - name: Make public key file
-        uses: jdharms/create-file@master
-        with:
-          file_contents: ${{ secrets.JWT_PUB_KEY }}
-          file_name: 'backend/jwtRS256.key'
+          uses: jdharms/create-file@master
+          with:
+            file_contents: ${{ secrets.JWT_PUB_KEY }}
+            file_name: 'backend/jwtRS256.key'
 
-  deploy:
-    needs:
-      - create-priv-key
-      - create-pub-key
-    name: Deploy to Google App Engine
-    runs-on: ubuntu-latest
-    steps:
       - name: Google Cloud Auth
         uses: actions/gcloud/auth@master
         with:
