@@ -31,6 +31,6 @@ jobs:
       - name: Google Cloud Deploy
         uses: actions/gcloud/cli@master
         with:
-          args: app deploy backend
+          args: --quiet app deploy backend
         env:
           CLOUDSDK_CORE_PROJECT: ${{ secrets.GCLOUD_PROJECT }}
