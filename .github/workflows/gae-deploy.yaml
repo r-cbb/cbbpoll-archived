@@ -9,9 +9,7 @@ jobs:
     name: Deploy to Google App Engine
     runs-on: ubuntu-latest
     steps:
-      - runs-on: ubuntu-latest
-        steps:
-          - uses: actions/checkout@master
+      - uses: actions/checkout@master
 
       - name: Make private key file
         uses: jdharms/create-file@master
