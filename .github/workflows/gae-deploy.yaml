@@ -26,7 +26,7 @@ jobs:
       - name: Google Cloud Auth
         uses: actions/gcloud/auth@master
         env:
-          gcloud_auth: ${{ secrets.GCLOUD_AUTH }}
+          GCLOUD_AUTH: ${{ secrets.GCLOUD_AUTH }}
 
       - name: Google Cloud Deploy
         uses: actions/gcloud/cli@master
