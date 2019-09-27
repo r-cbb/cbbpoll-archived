@@ -20,10 +20,10 @@ jobs:
           file_name: 'backend/jwtRS256.key'
 
       - name: Make public key file
-          uses: jdharms/create-file@master
-          with:
-            file_contents: ${{ secrets.JWT_PUB_KEY }}
-            file_name: 'backend/jwtRS256.key'
+        uses: jdharms/create-file@master
+        with:
+          file_contents: ${{ secrets.JWT_PUB_KEY }}
+          file_name: 'backend/jwtRS256.key'
 
       - name: Google Cloud Auth
         uses: actions/gcloud/auth@master
