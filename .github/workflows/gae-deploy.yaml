@@ -1,0 +1,43 @@
+on:
+  push:
+    branches: master
+
+name: Deploy to Google App Engine
+
+jobs:
+  create-priv-key:
+    runs-on: ubuntu-18.04
+    steps:
+      - name: Make private key file
+        uses: jdharms/create-file@master
+        with:
+          file_contents: ${{ secrets.JWT_PRIV_KEY }}
+          file_name: 'backend/jwtRS256.key'
+
+  create-pub-key:
+    runs-on: ubuntu-18.04
+    steps:
+      - name: Make public key file
+        uses: jdharms/create-file@master
+        with:
+          file_contents: ${{ secrets.JWT_PUB_KEY }}
+          file_name: 'backend/jwtRS256.key'
+
+  deploy:
+    needs:
+      - create-priv-key
+      - create-pub-key
+    name: Deploy to Google App Engine
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@master
+
+      - name: Google Cloud Auth
+        uses: actions/gcloud/auth@master
+        with:
+          gcloud_auth: ${{ secrets.GCLOUD_AUTH }}
+
+      - name: Google Cloud Deploy
+        uses: actions/gcloud/cli@master
+        with:
+          args: app deploy backend
