@@ -6,12 +6,13 @@ name: Deploy to Google App Engine
 
 jobs:
   checkout-source:
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@master
 
   create-priv-key:
     needs: checkout-source
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-latest
     steps:
       - name: Make private key file
         uses: jdharms/create-file@master
@@ -21,7 +22,7 @@ jobs:
 
   create-pub-key:
     needs: checkout-source
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-latest
     steps:
       - name: Make public key file
         uses: jdharms/create-file@master
