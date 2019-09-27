@@ -5,7 +5,12 @@ on:
 name: Deploy to Google App Engine
 
 jobs:
+  checkout-source:
+    steps:
+      - uses: actions/checkout@master
+
   create-priv-key:
+    needs: checkout-source
     runs-on: ubuntu-18.04
     steps:
       - name: Make private key file
@@ -15,6 +20,7 @@ jobs:
           file_name: 'backend/jwtRS256.key'
 
   create-pub-key:
+    needs: checkout-source
     runs-on: ubuntu-18.04
     steps:
       - name: Make public key file
@@ -30,8 +36,6 @@ jobs:
     name: Deploy to Google App Engine
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@master
-
       - name: Google Cloud Auth
         uses: actions/gcloud/auth@master
         with:
