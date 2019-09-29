@@ -17,10 +17,4 @@ jobs:
           PROJECT_PATH: "./backend"
           GO111MODULE: "on"
           IMPORT: "r-cbb/cbbpoll"
-
-      - uses: codecov/codecov-action@v1.0.2
-        with:
-          token: ${{secrets.CODECOV_TOKEN}}
-          file: ./backend/coverage.out
-          flags: unittests
-          name: cbbpoll-unittests
+          
