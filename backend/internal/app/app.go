@@ -2,14 +2,18 @@ package app
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/r-cbb/cbbpoll/internal/db"
 	"github.com/r-cbb/cbbpoll/internal/errors"
 	"github.com/r-cbb/cbbpoll/internal/models"
 )
 
+var numRanks = 5
+
 type PollService struct {
-	Db db.DBClient
+	Db     db.DBClient
+	Admins []string
 }
 
 func NewPollService(Db db.DBClient) *PollService {
@@ -62,8 +66,18 @@ func (ps PollService) AllTeams() (teams []models.Team, err error) {
 
 // NewUser is only to be used when a user logs in who does not have a user record
 // in the database.  This will create the user with base permissions.
-func (ps PollService) NewUser(newUser models.User) (models.User, error) {
+func (ps PollService) NewUser(nickname string) (models.User, error) {
 	const op errors.Op = "app.NewUser"
+	newUser := models.User{
+		Nickname: nickname,
+	}
+
+	for _, admin := range ps.Admins {
+		if nickname == admin {
+			newUser.IsAdmin = true
+		}
+	}
+
 	createdUser, err := ps.Db.AddUser(newUser)
 	if err != nil {
 		return models.User{}, errors.E(op, err, "error adding user to db")
@@ -100,6 +114,18 @@ func (ps PollService) GetUser(name string) (models.User, error) {
 	return user, nil
 }
 
+func (ps PollService) GetUsers(user models.UserToken, opts Options) ([]models.User, error) {
+	const op errors.Op = "app.GetUsers"
+	var users []models.User
+
+	users, err := ps.Db.GetUsers(opts.unpack())
+	if err != nil {
+		return nil, errors.E(err, op, "error retrieving users from db")
+	}
+
+	return users, nil
+}
+
 func (ps PollService) UpdateUser(user models.UserToken, name string, updatedUser models.User) (models.User, error) {
 	const op errors.Op = "app.UpdateUser"
 	if !user.LoggedIn() {
@@ -129,7 +155,7 @@ func (ps PollService) UpdateUser(user models.UserToken, name string, updatedUser
 
 	err = ps.Db.UpdateUser(updatedUser)
 	if err != nil {
-		return models.User{}, errors.E(op, "error updating user in db")
+		return models.User{}, errors.E(op, "error updating user in db", err)
 	}
 
 	return updatedUser, nil
@@ -166,4 +192,158 @@ func (ps PollService) GetPoll(season int, week int) (models.Poll, error) {
 	}
 
 	return poll, nil
+}
+
+func (ps PollService) GetResults(user models.UserToken, season int, week int) ([]models.Result, error) {
+	const op errors.Op = "app.GetResults"
+
+	poll, err := ps.Db.GetPoll(season, week)
+	if err != nil {
+		return nil, errors.E(op, err, "error retrieving poll from db")
+	}
+
+	if poll.CloseTime.After(time.Now()) && !user.CanManagePolls() {
+		return nil, errors.E(op, err, "can't view poll results until after poll close", errors.KindUnauthorized)
+	}
+
+	results, err := ps.Db.GetResults(poll, false)
+	if err != nil {
+		return nil, errors.E(op, err, "error retrieving results for poll")
+	}
+
+	if results == nil {
+		results, err = ps.calcPollResults(poll)
+		if err != nil {
+			return nil, errors.E(op, err, "error calculating poll results")
+		}
+	}
+
+	return results, nil
+}
+
+func (ps PollService) AddBallot(user models.UserToken, ballot models.Ballot) (models.Ballot, error) {
+	const op errors.Op = "app.AddBallot"
+	if !user.LoggedIn() {
+		return models.Ballot{}, errors.E(op, errors.KindUnauthenticated)
+	}
+
+	u, err := ps.Db.GetUser(ballot.User)
+	if err != nil {
+		return models.Ballot{}, errors.E(op, err, errors.KindBadRequest, "user doesn't exist")
+	}
+
+	if u.Nickname != user.Nickname && !user.IsAdmin {
+		return models.Ballot{}, errors.E(op, errors.KindUnauthorized, "can't submit ballot for another user")
+	}
+
+	ballot.IsOfficial = u.IsVoter
+	ballot.UpdatedTime = time.Now()
+
+	err = validateBallot(ballot)
+	if err != nil {
+		return models.Ballot{}, errors.E(op, err, "ballot failed validation", errors.KindBadRequest)
+	}
+
+	newBallot, err := ps.Db.AddBallot(ballot)
+	if err != nil {
+		return models.Ballot{}, errors.E(op, err, "error adding ballot to DB")
+	}
+
+	return newBallot, nil
+}
+
+func validateBallot(b models.Ballot) error {
+	vs := b.Votes
+
+	if len(vs) != numRanks {
+		return errors.E(fmt.Errorf("ballots must contain exactly %v votes", numRanks))
+	}
+
+	if containsDuplicates(vs) {
+		return errors.E(fmt.Errorf("ballot contains duplicate votes"))
+	}
+
+	if err := checkVotes(vs); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func containsDuplicates(vs []models.Vote) bool {
+	seen := make(map[int64]struct{})
+	for _, v := range vs {
+		_, ok := seen[v.TeamID]
+		if ok {
+			return true
+		}
+		seen[v.TeamID] = struct{}{}
+	}
+	return false
+}
+
+func checkVotes(vs []models.Vote) error {
+	for _, v := range vs {
+		if v.TeamID == 0 || v.Rank == 0 {
+			return fmt.Errorf("no votes can have a team_id or rank of 0")
+		}
+
+		if len(v.Reason) > 140 {
+			return fmt.Errorf("reasons can't be longer than 140 characters")
+		}
+	}
+
+	return nil
+}
+
+func (ps PollService) DeleteBallot(user models.UserToken, id int64) error {
+	const op errors.Op = "app.DeleteBallot"
+	if !user.LoggedIn() {
+		return errors.E(op, errors.KindUnauthenticated)
+	}
+
+	ballot, err := ps.Db.GetBallot(id)
+	if err != nil {
+		return errors.E(op, "error getting ballot", err)
+	}
+
+	if ballot.User != user.Nickname && !user.IsAdmin {
+		return errors.E(op, errors.KindUnauthorized, "can't delete someone else's ballot")
+	}
+
+	poll, err := ps.Db.GetPoll(ballot.PollSeason, ballot.PollWeek)
+	if err != nil {
+		return errors.E(op, "error getting poll for ballot")
+	}
+
+	if poll.CloseTime.Before(time.Now()) && !user.IsAdmin {
+		return errors.E(op, errors.KindBadRequest, "can't delete a ballot for a closed poll")
+	}
+
+	err = ps.Db.DeleteBallot(id)
+	if err != nil {
+		return errors.E(op, err, "error deleting ballot")
+	}
+
+	return nil
+}
+
+func (ps PollService) GetBallotById(user models.UserToken, id int64) (models.Ballot, error) {
+	const op errors.Op = "app.GetBallotById"
+
+	ballot, err := ps.Db.GetBallot(id)
+	if err != nil {
+		return models.Ballot{}, errors.E(op, err, "error retrieving ballot from DB")
+	}
+
+	poll, err := ps.Db.GetPoll(ballot.PollSeason, ballot.PollWeek)
+	if err != nil {
+		return models.Ballot{}, errors.E(op, err, "error retrieving poll for ballot")
+	}
+
+	if poll.CloseTime.After(time.Now()) && !user.IsAdmin && ballot.User != user.Nickname {
+		return models.Ballot{}, errors.E(op, err, "users can't see other's ballots until the poll closes", errors.KindUnauthorized)
+	}
+
+	return ballot, nil
 }

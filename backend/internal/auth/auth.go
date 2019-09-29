@@ -13,7 +13,7 @@ import (
 	"github.com/r-cbb/cbbpoll/internal/models"
 )
 
-type AuthClient interface {
+type Client interface {
 	Verifier() func(http.Handler) http.Handler
 	Authenticator(http.HandlerFunc) http.HandlerFunc
 	CreateJWT(u models.User) (string, error)

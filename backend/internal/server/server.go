@@ -18,7 +18,7 @@ Server is a type that holds state for the server, along with routers and handler
 */
 type Server struct {
 	App          *app.PollService
-	AuthClient   auth.AuthClient
+	AuthClient   auth.Client
 	RedditClient RedditClient
 	router       *mux.Router
 	host         string

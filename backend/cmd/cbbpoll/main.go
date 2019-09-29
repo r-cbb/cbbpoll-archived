@@ -24,7 +24,7 @@ func main() {
 	var err error
 
 	// Setup Datastore connection
-	db, err := db.NewDatastoreClient("cbbpoll")
+	datastoreClient, err := db.NewDatastoreClient("cbbpoll")
 	if err != nil {
 		log.Fatal(err.Error())
 		panic(err.Error())
@@ -32,7 +32,8 @@ func main() {
 	log.Println("\tDatastoreClient initialized")
 
 	// Setup service layer
-	srv.App = app.NewPollService(db)
+	srv.App = app.NewPollService(datastoreClient)
+	srv.App.Admins = append(srv.App.Admins, "Concision", "einsteins_haircut")
 
 	// Setup JWT Auth
 	setupAuth(srv)
