@@ -34,8 +34,8 @@ type User struct {
 }
 
 type VoterEvent struct {
-	IsVoter       bool
-	EffectiveTime time.Time
+	IsVoter       bool      `json:"is_voter"`
+	EffectiveTime time.Time `json:"effective_time"`
 }
 
 type Poll struct {
