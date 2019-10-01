@@ -236,6 +236,7 @@ func (db *DatastoreClient) AddUser(user models.User) (models.User, error) {
 	// Perform a Get or Put to ensure atomicity
 	err = db.client.Get(ctx, k, &tmp)
 	if err == nil {
+		_ = tx.Rollback()
 		return models.User{}, errors.E(op, "user already exists", errors.KindConflict, err)
 	} else if err != datastore.ErrNoSuchEntity {
 		_ = tx.Rollback()
@@ -346,6 +347,11 @@ func pollKeyFromWeek(season, week int) *datastore.Key {
 	return datastore.NameKey("Poll", fmt.Sprintf("%v-%v", season, week), nil)
 }
 
+type ballotPair struct {
+	BallotID     int64
+	UserNickname string
+}
+
 type Poll struct {
 	Season            int
 	Week              int
@@ -356,7 +362,7 @@ type Poll struct {
 	RedditURL         string
 	Results           []Result
 	UnofficialResults []Result
-	Ballots           []int64
+	Ballots           []ballotPair
 	MissingVoters     []string
 }
 
@@ -406,9 +412,30 @@ func (db *DatastoreClient) AddPoll(newPoll models.Poll) (models.Poll, error) {
 	}
 	poll.MissingVoters = currVoters
 
-	k, err = db.client.Put(ctx, k, &poll)
+	tx, err := db.client.NewTransaction(ctx)
 	if err != nil {
+		return models.Poll{}, errors.E(op, errors.KindDatabaseError, "unable to create transaction", err)
+	}
+
+	var tmp Poll
+	err = tx.Get(k, &tmp)
+	if err == nil {
+		_ = tx.Rollback()
+		return models.Poll{}, errors.E(op, errors.KindConflict, "poll for season/week pair already exists", err)
+	} else if err != datastore.ErrNoSuchEntity {
+		_ = tx.Rollback()
+		return models.Poll{}, errors.E(op, errors.KindDatabaseError, "error checking for existing poll", err)
+	}
+
+	_, err = tx.Put(k, &poll)
+	if err != nil {
+		_ = tx.Rollback()
 		return models.Poll{}, errors.E(op, "error on Put operation for Poll", errors.KindDatabaseError, err)
+	}
+
+	_, err = tx.Commit()
+	if err != nil {
+		return models.Poll{}, errors.E(op, errors.KindDatabaseError, "error committing transaction", err)
 	}
 
 	contract := poll.ToContract()
@@ -644,7 +671,7 @@ func (db *DatastoreClient) AddBallot(newBallot models.Ballot) (models.Ballot, er
 
 	var tmp models.Ballot
 
-	// Perform a Get or Put to ensure atomicity
+	// Perform a Get or Put to ensure atomicity on selected ID
 	err = tx.Get(k, &tmp)
 	if err == nil || err != datastore.ErrNoSuchEntity {
 		if err == nil {
@@ -654,12 +681,6 @@ func (db *DatastoreClient) AddBallot(newBallot models.Ballot) (models.Ballot, er
 		return models.Ballot{}, errors.E(op, "concurrency error adding Ballot", errors.KindConcurrencyProblem, err)
 	}
 
-	pk, err := tx.Put(k, &ballot)
-	if err != nil {
-		_ = tx.Rollback()
-		return models.Ballot{}, errors.E(op, "error on Put operation for Ballot", errors.KindDatabaseError, err)
-	}
-
 	var poll Poll
 	err = tx.Get(ballot.Poll, &poll)
 	if err != nil {
@@ -667,8 +688,21 @@ func (db *DatastoreClient) AddBallot(newBallot models.Ballot) (models.Ballot, er
 		return models.Ballot{}, errors.E(op, "error retrieving poll for Ballot", errors.KindDatabaseError)
 	}
 
+	for _, bp := range poll.Ballots {
+		if bp.UserNickname == newBallot.User {
+			_ = tx.Rollback()
+			return models.Ballot{}, errors.E(op, "user already has a ballot submitted for this poll", errors.KindConflict, err)
+		}
+	}
+
+	pk, err := tx.Put(k, &ballot)
+	if err != nil {
+		_ = tx.Rollback()
+		return models.Ballot{}, errors.E(op, "error on Put operation for Ballot", errors.KindDatabaseError, err)
+	}
+
 	// Add ballot to Poll's list of ballots, clear all results
-	poll.Ballots = append(poll.Ballots, newID)
+	poll.Ballots = append(poll.Ballots, ballotPair{BallotID: newID, UserNickname: newBallot.User})
 	poll.Results = nil
 	poll.UnofficialResults = nil
 
@@ -770,9 +804,9 @@ func (db *DatastoreClient) DeleteBallot(id int64) error {
 		return errors.E(op, "error retrieving poll for ballot", errors.KindDatabaseError, err)
 	}
 
-	newBallots := make([]int64, 0, len(poll.Ballots))
+	newBallots := make([]ballotPair, 0, len(poll.Ballots))
 	for _, ref := range poll.Ballots {
-		if ref != id {
+		if ref.BallotID != id {
 			newBallots = append(newBallots, ref)
 		}
 	}
@@ -857,8 +891,8 @@ func (db *DatastoreClient) GetBallotsByPoll(poll models.Poll) ([]models.Ballot, 
 
 	var ks []*datastore.Key
 
-	for _, id := range tmp.Ballots {
-		ks = append(ks, datastore.IDKey("Ballot", id, nil))
+	for _, bp := range tmp.Ballots {
+		ks = append(ks, datastore.IDKey("Ballot", bp.BallotID, nil))
 	}
 
 	bs := make([]*Ballot, len(ks))

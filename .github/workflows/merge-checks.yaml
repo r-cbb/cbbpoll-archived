@@ -17,4 +17,3 @@ jobs:
           PROJECT_PATH: "./backend"
           GO111MODULE: "on"
           IMPORT: "r-cbb/cbbpoll"
-          

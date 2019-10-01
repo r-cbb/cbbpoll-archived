@@ -171,11 +171,6 @@ func (ps PollService) AddPoll(user models.UserToken, poll models.Poll) (models.P
 		return models.Poll{}, errors.E(op, errors.KindUnauthorized, "user doesn't have sufficient permissions to add a poll")
 	}
 
-	_, err := ps.Db.GetPoll(poll.Season, poll.Week)
-	if errors.Kind(err) != errors.KindNotFound {
-		return models.Poll{}, errors.E(op, errors.KindConflict, fmt.Sprintf("poll already exists for season %v week %v", poll.Season, poll.Week))
-	}
-
 	newPoll, err := ps.Db.AddPoll(poll)
 	if err != nil {
 		return models.Poll{}, errors.E(op, "error adding poll to db", err)
