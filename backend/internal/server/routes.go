@@ -327,8 +327,12 @@ func (s *Server) handleAddPoll() http.HandlerFunc {
 
 func (s *Server) handleListPolls() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		log.Println("handleListPolls not implemented")
-		return
+		token := s.AuthClient.UserTokenFromCtx(r.Context())
+
+		polls, err := s.App.GetPolls(token, app.NewOptions())
+		if err != nil {
+
+		}
 	}
 }
 

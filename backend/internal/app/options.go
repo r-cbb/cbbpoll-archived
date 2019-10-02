@@ -1,6 +1,9 @@
 package app
 
-import "github.com/r-cbb/cbbpoll/internal/db"
+import (
+	"github.com/r-cbb/cbbpoll/internal/db"
+	"time"
+)
 
 type Options struct {
 	filters []db.Filter
@@ -21,5 +24,10 @@ func (opt Options) unpack() ([]db.Filter, db.Sort) {
 
 func (opt Options) IsVoter(b bool) Options {
 	opt.filters = append(opt.filters, db.Filter{Field: "IsVoter", Operator: "=", Value: b})
+	return opt
+}
+
+func (opt Options) HasOpened() Options {
+	opt.filters = append(opt.filters, db.Filter{Field: "OpenTime", Operator: "<", Value: time.Now()})
 	return opt
 }

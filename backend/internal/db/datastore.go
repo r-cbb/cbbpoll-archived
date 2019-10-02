@@ -397,7 +397,6 @@ type Result struct {
 	Points          int
 }
 
-// todo check for existing poll inside transaction
 func (db *DatastoreClient) AddPoll(newPoll models.Poll) (models.Poll, error) {
 	const op errors.Op = "datastore.AddPoll"
 	ctx := context.Background()
@@ -461,6 +460,33 @@ func (db *DatastoreClient) GetPoll(season int, week int) (models.Poll, error) {
 	contract := poll.ToContract()
 
 	return contract, nil
+}
+
+func (db *DatastoreClient) GetPolls(filters []Filter, sort Sort) ([]models.Poll, error) {
+	const op errors.Op = "datastore.GetPolls"
+	ctx := context.Background()
+
+	q := datastore.NewQuery("Poll")
+	q = filterAndSort(q, filters, sort)
+
+	var polls []Poll
+	_, err := db.client.GetAll(ctx, q, &polls)
+	if err != nil {
+		return nil, errors.E(op, err, errors.KindDatabaseError, "error getting Polls")
+	}
+
+	// If there are no results, return an empty list instead of nil
+	if polls == nil {
+		return []models.Poll{}, nil
+	}
+
+	contractPolls := make([]models.Poll, len(polls))
+
+	for i := range polls {
+		contractPolls[i] = polls[i].ToContract()
+	}
+
+	return contractPolls, nil
 }
 
 func (db *DatastoreClient) UpdatePoll(poll models.Poll) error {
