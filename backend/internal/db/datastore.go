@@ -279,10 +279,7 @@ func (db *DatastoreClient) UpdateUser(user models.User) error {
 		return errors.E(op, "user not found to update", errors.KindNotFound, err)
 	}
 
-	user.VoterEvents = oldUser.VoterEvents
 	if user.IsVoter != oldUser.IsVoter {
-		user.VoterEvents = append([]models.VoterEvent{{IsVoter: user.IsVoter, EffectiveTime: time.Now()}}, oldUser.VoterEvents...)
-
 		// Adjust future polls
 		polls, err := db.futurePolls()
 		if err != nil {

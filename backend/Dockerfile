@@ -9,7 +9,7 @@ RUN go mod download
 
 COPY . .
 
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o cbbpoll cmd/cbbpoll/main.go
+RUN CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -o cbbpoll cmd/cbbpoll/main.go
 
 # final stage
 # At some point we might find we need enough "extra" stuff to warrant using golang:alpine or

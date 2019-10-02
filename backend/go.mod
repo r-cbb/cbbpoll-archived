@@ -13,6 +13,8 @@ require (
 	github.com/gorilla/mux v1.7.3
 	github.com/gorilla/websocket v1.4.1 // indirect
 	github.com/grpc-ecosystem/grpc-gateway v1.11.1 // indirect
+	github.com/jmoiron/sqlx v1.2.0
+	github.com/mattn/go-sqlite3 v1.11.0
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.1 // indirect
 	github.com/prometheus/procfs v0.0.4 // indirect

@@ -125,6 +125,7 @@ func (s *Server) handleGetTeam() http.HandlerFunc {
 				return
 			}
 
+			log.Println(err.Error())
 			s.respond(w, r, nil, http.StatusInternalServerError)
 			return
 		}
