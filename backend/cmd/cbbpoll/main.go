@@ -24,7 +24,7 @@ func main() {
 	var err error
 
 	// Setup Database connection
-	db, err := sqlite.NewClient("cbbpoll.db")
+	db, err := sqlite.NewClient("/data/cbbpoll.db")
 	if err != nil {
 		log.Fatal(err.Error())
 		panic(err.Error())

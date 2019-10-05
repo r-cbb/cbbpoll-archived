@@ -1,26 +1,13 @@
 version: "3.7"
 
 services:
-  datastore:
-    image: singularities/datastore-emulator
-    environment:
-      - DATASTORE_PROJECT_ID=cbbpoll
-      - DATASTORE_LISTEN_ADDRESS=0.0.0.0:8081
-    ports:
-      - "8081:8081"
-    volumes:
-      - dbdata:/opt/data
-
   cbbpoll:
     image: cbbpoll-image
     build: .
-    depends_on:
-      - datastore
-    environment:
-      - DATASTORE_EMULATOR_HOST=datastore:8081
-      - DATASTORE_PROJECT_ID=cbbpoll
     ports:
       - "8000:8000"
+    volumes:
+      - ./dbdata:/data
 
   test:
     build:
@@ -35,5 +22,3 @@ services:
     ports:
       - 8080:8080
 
-volumes:
-  dbdata:
