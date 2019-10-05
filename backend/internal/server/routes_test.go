@@ -50,7 +50,6 @@ var testAdmin = models.User{
 var testUser = models.User{
 	Nickname:    "JohnDoe",
 	IsAdmin:     false,
-	VoterEvents: nil,
 }
 
 func addTeamMockDb() *mocks.DBClient {

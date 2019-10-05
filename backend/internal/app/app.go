@@ -220,7 +220,7 @@ func (ps PollService) GetResults(user models.UserToken, season int, week int) ([
 		return nil, errors.E(op, err, "error retrieving results for poll")
 	}
 
-	if results == nil {
+	if len(results) == 0 {
 		results, err = ps.calcPollResults(poll)
 		if err != nil {
 			return nil, errors.E(op, err, "error calculating poll results")

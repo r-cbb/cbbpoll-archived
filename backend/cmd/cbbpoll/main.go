@@ -25,7 +25,7 @@ func main() {
 
 	// Setup Datastore connection
 	// db, err := db.NewDatastoreClient("cbbpoll")
-	db, err := sqlite.NewClient("foo")
+	db, err := sqlite.NewClient("cbbpoll.db")
 	if err != nil {
 		log.Fatal(err.Error())
 		panic(err.Error())

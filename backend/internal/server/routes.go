@@ -90,6 +90,7 @@ func (s *Server) handleAddTeam() http.HandlerFunc {
 				s.respond(w, r, nil, http.StatusForbidden)
 				return
 			default:
+				log.Println(err.Error())
 				s.respond(w, r, nil, http.StatusInternalServerError)
 				return
 			}
@@ -328,12 +329,12 @@ func (s *Server) handleAddPoll() http.HandlerFunc {
 
 func (s *Server) handleListPolls() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		token := s.AuthClient.UserTokenFromCtx(r.Context())
-
-		polls, err := s.App.GetPolls(token, app.NewOptions())
-		if err != nil {
-
-		}
+		// token := s.AuthClient.UserTokenFromCtx(r.Context())
+		//
+		// polls, err := s.App.GetPolls(token, app.NewOptions())
+		// if err != nil {
+		//
+		// }
 	}
 }
 

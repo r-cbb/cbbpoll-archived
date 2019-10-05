@@ -96,7 +96,7 @@ func (ps PollService) resultsFromBallots(bs []models.Ballot) ([]models.Result, e
 		resMap[t.ID] = mapTeam
 	}
 
-	results := make(resultsSlice, 0, len(resMap))
+	results := make(resultsSlice, len(resMap))
 	i = 0
 	for k, v := range resMap {
 		v.TeamID = k

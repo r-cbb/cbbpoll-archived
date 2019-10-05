@@ -28,9 +28,9 @@ type DBClient interface {
 }
 
 type Filter struct {
-	Field    string
-	Operator string
-	Value    interface{}
+	Field    string // value trusted
+	Operator string // value trusted
+	Value    interface{} // untrusted user input
 }
 
 type Sort struct {
