@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"github.com/r-cbb/cbbpoll/internal/db/sqlite"
 	"log"
 	"net/http"
 	"os"
@@ -13,6 +12,7 @@ import (
 	_ "github.com/r-cbb/cbbpoll/docs"
 	"github.com/r-cbb/cbbpoll/internal/app"
 	"github.com/r-cbb/cbbpoll/internal/auth"
+	"github.com/r-cbb/cbbpoll/internal/db/sqlite"
 	"github.com/r-cbb/cbbpoll/internal/server"
 )
 
@@ -23,14 +23,13 @@ func main() {
 	srv := server.NewServer()
 	var err error
 
-	// Setup Datastore connection
-	// db, err := db.NewDatastoreClient("cbbpoll")
+	// Setup Database connection
 	db, err := sqlite.NewClient("cbbpoll.db")
 	if err != nil {
 		log.Fatal(err.Error())
 		panic(err.Error())
 	}
-	log.Println("\tDatastoreClient initialized")
+	log.Println("\tSqlite Client initialized")
 
 	// Setup service layer
 	srv.App = app.NewPollService(db)
