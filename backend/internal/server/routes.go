@@ -36,12 +36,16 @@ func (s *Server) Routes() {
 	// Polls
 	s.router.HandleFunc(fmt.Sprintf("%s/polls", v1), s.handleAddPoll()).Methods(http.MethodPost)
 	s.router.HandleFunc(fmt.Sprintf("%s/polls", v1), s.handleListPolls()).Methods(http.MethodGet)
+	// %s/polls/&is_open=true
+	// ability to sort by close time to find most recent
 	s.router.HandleFunc(fmt.Sprintf("%s/polls/{season:[0-9]+}/{week:[0-9]+}", v1), s.handleGetPoll()).Methods(http.MethodGet).Name("poll")
 	s.router.HandleFunc(fmt.Sprintf("%s/polls/{season:[0-9]+}/{week:[0-9]+}/results", v1), s.handleGetResults()).Methods(http.MethodGet)
+	/// %s/polls/{season:[0-9]+}/{week:[0-9]+}/ballots --
 
 	// Ballots
 	s.router.HandleFunc(fmt.Sprintf("%s/ballots", v1), s.handleAddBallot()).Methods(http.MethodPost)
 	s.router.HandleFunc(fmt.Sprintf("%s/ballots", v1), s.handleListBallots()).Methods(http.MethodGet)
+	// ?user=Concision&season=2020&week=0
 	s.router.HandleFunc(fmt.Sprintf("%s/ballots/{id:[0-9]+}", v1), s.handleEditBallot()).Methods(http.MethodPut)
 	s.router.HandleFunc(fmt.Sprintf("%s/ballots/{id:[0-9]+}", v1), s.handleGetBallot()).Methods(http.MethodGet).Name("ballot")
 	s.router.HandleFunc(fmt.Sprintf("%s/ballots/{id:[0-9]+}", v1), s.handleDeleteBallot()).Methods(http.MethodDelete)
@@ -86,6 +90,7 @@ func (s *Server) handleAddTeam() http.HandlerFunc {
 				s.respond(w, r, nil, http.StatusForbidden)
 				return
 			default:
+				log.Println(err.Error())
 				s.respond(w, r, nil, http.StatusInternalServerError)
 				return
 			}
@@ -121,6 +126,7 @@ func (s *Server) handleGetTeam() http.HandlerFunc {
 				return
 			}
 
+			log.Println(err.Error())
 			s.respond(w, r, nil, http.StatusInternalServerError)
 			return
 		}
@@ -323,8 +329,12 @@ func (s *Server) handleAddPoll() http.HandlerFunc {
 
 func (s *Server) handleListPolls() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		log.Println("handleListPolls not implemented")
-		return
+		// token := s.AuthClient.UserTokenFromCtx(r.Context())
+		//
+		// polls, err := s.App.GetPolls(token, app.NewOptions())
+		// if err != nil {
+		//
+		// }
 	}
 }
 

@@ -16,6 +16,7 @@ type DBClient interface {
 	AddPoll(newPoll models.Poll) (poll models.Poll, err error)
 	UpdatePoll(poll models.Poll) error
 	GetPoll(season int, week int) (poll models.Poll, err error)
+	GetPolls(filter []Filter, sort Sort) ([]models.Poll, error)
 	SetResults(poll models.Poll, official []models.Result, allBallots []models.Result) error
 	GetResults(poll models.Poll, includeProvisional bool) (results []models.Result, err error)
 
@@ -27,9 +28,9 @@ type DBClient interface {
 }
 
 type Filter struct {
-	Field    string
-	Operator string
-	Value    interface{}
+	Field    string // value trusted
+	Operator string // value trusted
+	Value    interface{} // untrusted user input
 }
 
 type Sort struct {

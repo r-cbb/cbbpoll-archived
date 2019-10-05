@@ -12,7 +12,7 @@ import (
 	_ "github.com/r-cbb/cbbpoll/docs"
 	"github.com/r-cbb/cbbpoll/internal/app"
 	"github.com/r-cbb/cbbpoll/internal/auth"
-	"github.com/r-cbb/cbbpoll/internal/db"
+	"github.com/r-cbb/cbbpoll/internal/db/sqlite"
 	"github.com/r-cbb/cbbpoll/internal/server"
 )
 
@@ -23,16 +23,16 @@ func main() {
 	srv := server.NewServer()
 	var err error
 
-	// Setup Datastore connection
-	datastoreClient, err := db.NewDatastoreClient("cbbpoll")
+	// Setup Database connection
+	db, err := sqlite.NewClient("/data/cbbpoll.db")
 	if err != nil {
 		log.Fatal(err.Error())
 		panic(err.Error())
 	}
-	log.Println("\tDatastoreClient initialized")
+	log.Println("\tSqlite Client initialized")
 
 	// Setup service layer
-	srv.App = app.NewPollService(datastoreClient)
+	srv.App = app.NewPollService(db)
 	srv.App.Admins = append(srv.App.Admins, "Concision", "einsteins_haircut")
 
 	// Setup JWT Auth
