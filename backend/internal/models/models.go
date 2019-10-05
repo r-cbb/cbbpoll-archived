@@ -32,11 +32,6 @@ type User struct {
 	PrimaryTeam int64        `json:"primary_team"`
 }
 
-type VoterEvent struct {
-	IsVoter       bool      `json:"is_voter"`
-	EffectiveTime time.Time `json:"effective_time"`
-}
-
 type Poll struct {
 	// example: 2020
 	Season int `json:"season"`
