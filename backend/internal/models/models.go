@@ -38,6 +38,7 @@ type VoterEvent struct {
 }
 
 type Poll struct {
+	// example: 2020
 	Season int `json:"season"`
 	// example: 3
 	Week int `json:"week"`
