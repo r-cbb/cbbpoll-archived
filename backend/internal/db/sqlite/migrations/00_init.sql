@@ -4,7 +4,8 @@ CREATE TABLE team
   full_name  VARCHAR(64),
   short_name VARCHAR(32),
   nickname   VARCHAR(32),
-  conference VARCHAR(32)
+  conference VARCHAR(32),
+  slug       VARCHAR(32)
 );
 
 CREATE TABLE user
@@ -36,12 +37,12 @@ CREATE TABLE ballot
   poll_week    INTEGER,
   updated_time DATETIME,
   user         VARCHAR(32),
-  user_team    INTEGER,
-  user_team_slug VARCHAR(32),
+--   user_team    INTEGER,
+--   user_team_slug VARCHAR(32),
   is_official  BOOLEAN,
   FOREIGN KEY (poll_season, poll_week) REFERENCES poll (season, week),
-  FOREIGN KEY (user) REFERENCES user (nickname),
-  FOREIGN KEY (user_team) REFERENCES team (id)
+  FOREIGN KEY (user) REFERENCES user (nickname)
+--  FOREIGN KEY (user_team) REFERENCES team (id)
 );
 
 CREATE TABLE vote

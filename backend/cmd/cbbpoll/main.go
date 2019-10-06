@@ -115,6 +115,11 @@ func main() {
 		log.Println("Done")
 	}
 
+	err = db.Close()
+	if err != nil {
+		log.Printf("Error closing db: %s", err.Error())
+	}
+
 	os.Exit(0)
 }
 

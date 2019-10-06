@@ -45,17 +45,17 @@ func (ps PollService) calcPollResults(poll models.Poll) ([]models.Result, error)
 		return nil, errors.E(op, err, "error calculating results from official ballots")
 	}
 
-	results, err := ps.resultsFromBallots(ballots)
+	allResults, err := ps.resultsFromBallots(ballots)
 	if err != nil {
 		return nil, errors.E(op, err, "error calculating results from all ballots")
 	}
 
-	err = ps.Db.SetResults(poll, officialResults, results)
+	err = ps.Db.SetResults(poll, officialResults, allResults)
 	if err != nil {
 		return nil, errors.E(op, err, "error updating poll after calculating results")
 	}
 
-	return []models.Result(results), nil
+	return []models.Result(officialResults), nil
 }
 
 func (ps PollService) resultsFromBallots(bs []models.Ballot) ([]models.Result, error) {

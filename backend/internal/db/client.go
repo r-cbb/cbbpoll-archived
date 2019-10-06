@@ -3,6 +3,8 @@ package db
 import "github.com/r-cbb/cbbpoll/internal/models"
 
 type DBClient interface {
+	Close() error
+
 	AddTeam(newTeam models.Team) (team models.Team, err error)
 	GetTeam(id int64) (team models.Team, err error)
 	GetTeams() (teams []models.Team, err error)
