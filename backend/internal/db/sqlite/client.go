@@ -22,9 +22,14 @@ type Client struct {
 func NewClient(filename string) (*Client, error) {
 	const op errors.Op = "sqlite.NewClient"
 
-	sqliteDb, err := sqlx.Open("sqlite3", fmt.Sprintf("file:%s?_fk=true", filename))
+	sqliteDb, err := sqlx.Open("sqlite3", fmt.Sprintf("file:%s?_fk=true&_busy_timeout=5000", filename))
 	if err != nil {
 		return nil, errors.E("could not open sqlite db", err, op, errors.KindDatabaseError)
+	}
+
+	err = sqliteDb.Ping()
+	if err != nil {
+		return nil, errors.E(op, err, "error connecting to database")
 	}
 
 	return &Client{db: sqliteDb}, nil

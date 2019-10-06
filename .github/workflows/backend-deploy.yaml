@@ -2,38 +2,33 @@ on:
   push:
     branches: master
 
-name: Deploy to Google App Engine
+name: Deploy to Google Compute Engine
 
 jobs:
   deploy:
-    name: Deploy to Google App Engine
+    name: Deploy to Google Compute Engine
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@master
+      - name: Checkout source code
+        uses: actions/checkout@master
 
-      - name: Make private key file
-        uses: jdharms/create-file@master
+      - name: Publish to Registry
+        uses: elgohr/Publish-Docker-Github-Action@master
         with:
-          file_contents: ${{ secrets.JWT_PRIV_KEY }}
-          file_name: 'backend/jwtRS256.key'
-
-      - name: Make public key file
-        uses: jdharms/create-file@master
-        with:
-          file_contents: ${{ secrets.JWT_PUB_KEY }}
-          file_name: 'backend/jwtRS256.key'
+          dockerfile: backend/Dockerfile
+          name: ${{ secrets.DOCKERHUB_NAME }}
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
 
       - name: Google Cloud Auth
         uses: actions/gcloud/auth@master
         env:
           GCLOUD_AUTH: ${{ secrets.GCLOUD_AUTH }}
 
-      - name: Google Cloud Deploy
+      - name: Google Compute Engine Update
         uses: actions/gcloud/cli@master
         with:
-          args: --quiet app deploy backend
-        env:
-          CLOUDSDK_CORE_PROJECT: ${{ secrets.GCLOUD_PROJECT }}
+          args: --quiet compute instances update-container ${{ secrets.GCE_INSTANCE }}
 
   coverage:
     name: Test Coverage Upload

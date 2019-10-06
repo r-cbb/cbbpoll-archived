@@ -5,5 +5,5 @@ docker-compose.yml
 README.md
 coverage.out
 app.yaml
-dbdata
+data
 dumps
