@@ -9,5 +9,6 @@ require (
 	github.com/mattn/go-sqlite3 v1.11.0
 	github.com/rs/cors v1.7.0
 	github.com/stretchr/testify v1.4.0
+	golang.org/x/crypto v0.0.0-20190605123033-f99c8df09eb5
 	google.golang.org/appengine v1.6.4 // indirect
 )
