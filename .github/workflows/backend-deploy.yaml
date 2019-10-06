@@ -19,6 +19,7 @@ jobs:
           name: ${{ secrets.DOCKERHUB_NAME }}
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
+          workdir: backend
 
       - name: Google Cloud Auth
         uses: actions/gcloud/auth@master
