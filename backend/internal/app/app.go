@@ -3,13 +3,14 @@ package app
 import (
 	"fmt"
 	"time"
+	"unicode/utf8"
 
 	"github.com/r-cbb/cbbpoll/internal/db"
 	"github.com/r-cbb/cbbpoll/internal/errors"
 	"github.com/r-cbb/cbbpoll/internal/models"
 )
 
-var numRanks = 5
+var numRanks = 25
 
 type PollService struct {
 	Db     db.DBClient
@@ -245,8 +246,8 @@ func (ps PollService) AddBallot(user models.UserToken, ballot models.Ballot) (mo
 		return models.Ballot{}, errors.E(op, errors.KindUnauthorized, "can't submit ballot for another user")
 	}
 
-	ballot.IsOfficial = u.IsVoter
-	ballot.UpdatedTime = time.Now()
+	// ballot.IsOfficial = u.IsVoter
+	// ballot.UpdatedTime = time.Now()
 
 	err = ps.validateBallot(ballot)
 	if err != nil {
@@ -265,7 +266,7 @@ func (ps PollService) validateBallot(b models.Ballot) error {
 	vs := b.Votes
 
 	if len(vs) != numRanks {
-		return errors.E(fmt.Errorf("ballots must contain exactly %v votes", numRanks))
+		return errors.E(fmt.Errorf("ballots must contain exactly %v votes, found %v", numRanks, len(vs)))
 	}
 
 	if containsDuplicates(vs) {
@@ -299,7 +300,7 @@ func checkVotes(vs []models.Vote, db db.DBClient) error {
 			return fmt.Errorf("no votes can have a team_id or rank of 0")
 		}
 
-		if len(v.Reason) > 140 {
+		if utf8.RuneCountInString(v.Reason) > 140 {
 			return fmt.Errorf("reasons can't be longer than 140 characters")
 		}
 	}

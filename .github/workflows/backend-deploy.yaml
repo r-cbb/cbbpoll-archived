@@ -29,7 +29,7 @@ jobs:
       - name: Google Compute Engine Update
         uses: actions/gcloud/cli@master
         with:
-          args: --quiet compute instances update-container ${{ secrets.GCE_INSTANCE }}
+          args: --quiet compute instances  update-container ${{ secrets.GCE_INSTANCE }} --zone us-central1-a
 
   coverage:
     name: Test Coverage Upload

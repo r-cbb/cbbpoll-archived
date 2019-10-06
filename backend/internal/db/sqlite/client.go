@@ -19,10 +19,14 @@ type Client struct {
 	db *sqlx.DB
 }
 
+func (c *Client) Close() error {
+	return c.db.Close()
+}
+
 func NewClient(filename string) (*Client, error) {
 	const op errors.Op = "sqlite.NewClient"
 
-	sqliteDb, err := sqlx.Open("sqlite3", fmt.Sprintf("file:%s?_fk=true&_busy_timeout=5000", filename))
+	sqliteDb, err := sqlx.Open("sqlite3", fmt.Sprintf("file:%s?_fk=true&_busy_timeout=5000&_journal_mode=WAL", filename))
 	if err != nil {
 		return nil, errors.E("could not open sqlite db", err, op, errors.KindDatabaseError)
 	}
@@ -40,8 +44,8 @@ func (c *Client) AddTeam(newTeam models.Team) (team models.Team, err error) {
 	var t Team
 	t.fromContract(newTeam)
 
-	res, err := c.db.Exec("INSERT INTO team (full_name, short_name, nickname, conference) VALUES ($1, $2, $3, $4)",
-		t.FullName, t.ShortName, t.Nickname, t.Conference)
+	res, err := c.db.Exec("INSERT INTO team (full_name, short_name, nickname, conference, slug) VALUES ($1, $2, $3, $4, $5)",
+		t.FullName, t.ShortName, t.Nickname, t.Conference, t.Slug)
 
 	if err != nil {
 		return models.Team{}, errors.E(op, err, "error adding team to db", errors.KindDatabaseError)
@@ -464,7 +468,12 @@ func (c *Client) GetResults(poll models.Poll, includeProvisional bool) ([]models
 	const op errors.Op = "sqlite.GetResults"
 	var rs []Result
 
-	err := c.db.Select(&rs, "SELECT * FROM result WHERE poll_season = ? AND poll_week = ?", poll.Season, poll.Week)
+	var err error
+	if includeProvisional {
+		err = c.db.Select(&rs, "SELECT * FROM result WHERE poll_season = ? AND poll_week = ?", poll.Season, poll.Week)
+	} else {
+		err = c.db.Select(&rs, "SELECT * FROM result WHERE poll_season = ? AND poll_week = ? AND official = TRUE", poll.Season, poll.Week)
+	}
 	if err != nil {
 		return nil, errors.E(op, err, "error retrieving rows from db", errors.KindDatabaseError)
 	}

@@ -12,6 +12,7 @@ type Team struct {
 	ShortName  string `db:"short_name"`
 	Nickname   string
 	Conference string
+	Slug       string
 }
 
 func (t *Team) fromContract(ct models.Team) {
@@ -20,6 +21,7 @@ func (t *Team) fromContract(ct models.Team) {
 	t.ShortName = ct.ShortName
 	t.Nickname = ct.Nickname
 	t.Conference = ct.Conference
+	t.Slug = ct.Slug
 }
 
 func (t *Team) toContract() models.Team {
@@ -29,6 +31,7 @@ func (t *Team) toContract() models.Team {
 		ShortName:  t.ShortName,
 		Nickname:   t.Nickname,
 		Conference: t.Conference,
+		Slug:       t.Slug,
 	}
 
 	return ct
@@ -36,8 +39,8 @@ func (t *Team) toContract() models.Team {
 
 type User struct {
 	Nickname    string
-	IsAdmin     bool  `db:"is_admin"`
-	IsVoter     bool  `db:"is_voter"`
+	IsAdmin     bool   `db:"is_admin"`
+	IsVoter     bool   `db:"is_voter"`
 	PrimaryTeam *int64 `db:"primary_team"`
 }
 
@@ -52,9 +55,9 @@ func (u *User) fromContract(cu models.User) {
 
 func (u *User) toContract() models.User {
 	cu := models.User{
-		Nickname:    u.Nickname,
-		IsAdmin:     u.IsAdmin,
-		IsVoter:     u.IsVoter,
+		Nickname: u.Nickname,
+		IsAdmin:  u.IsAdmin,
+		IsVoter:  u.IsVoter,
 	}
 
 	if u.PrimaryTeam != nil {
@@ -178,15 +181,15 @@ func (v *Vote) toContract() models.Vote {
 }
 
 type Result struct {
-	Season int `db:"poll_season"`
-	Week int `db:"poll_week"`
-	TeamID int64 `db:"team_id"`
-	TeamName string `db:"team_name"`
-	TeamSlug string `db:"team_slug"`
-	Rank int
+	Season          int    `db:"poll_season"`
+	Week            int    `db:"poll_week"`
+	TeamID          int64  `db:"team_id"`
+	TeamName        string `db:"team_name"`
+	TeamSlug        string `db:"team_slug"`
+	Rank            int
 	FirstPlaceVotes int `db:"first_place_votes"`
-	Points int
-	Official bool
+	Points          int
+	Official        bool
 }
 
 func (r *Result) fromContract(cr models.Result, cp models.Poll, official bool) {
@@ -203,12 +206,12 @@ func (r *Result) fromContract(cr models.Result, cp models.Poll, official bool) {
 
 func (r *Result) toContract() models.Result {
 	cr := models.Result{
-		TeamID: r.TeamID,
-		TeamName: r.TeamName,
-		TeamSlug: r.TeamSlug,
-		Rank: r.Rank,
+		TeamID:          r.TeamID,
+		TeamName:        r.TeamName,
+		TeamSlug:        r.TeamSlug,
+		Rank:            r.Rank,
 		FirstPlaceVotes: r.FirstPlaceVotes,
-		Points: r.Points,
+		Points:          r.Points,
 	}
 
 	return cr
