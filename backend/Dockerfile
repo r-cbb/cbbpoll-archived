@@ -29,9 +29,5 @@ COPY --from=builder /dist /
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 COPY --from=builder /etc/passwd /etc/passwd
 
-# copy keys
-COPY jwtRS256.key .
-COPY jwtRS256.key.pub .
-
 EXPOSE 8000
 ENTRYPOINT ["/cbbpoll"]

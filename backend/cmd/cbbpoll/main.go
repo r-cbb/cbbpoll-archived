@@ -1,13 +1,19 @@
 package main
 
 import (
+	"context"
+	"crypto/tls"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
+	"strings"
+	"syscall"
 	"time"
 
 	"github.com/rs/cors"
+	"golang.org/x/crypto/acme/autocert"
 
 	_ "github.com/r-cbb/cbbpoll/docs"
 	"github.com/r-cbb/cbbpoll/internal/app"
@@ -52,34 +58,103 @@ func main() {
 	srv.RedditClient = server.NewRedditClient("https://oauth.reddit.com/api/v1")
 
 	// Enable CORS for Swagger-UI
-	// TODO behind config flag as well?
 	c := cors.New(cors.Options{
-		Debug: false,
-		AllowedHeaders:[]string{"*"},
-		AllowedOrigins:[]string{"*"},
-		AllowedMethods:[]string{},
-		MaxAge:1000,
+		Debug:          false,
+		AllowedHeaders: []string{"*"},
+		AllowedOrigins: []string{"*"},
+		AllowedMethods: []string{},
+		MaxAge:         1000,
 	})
 
-	handler := c.Handler(srv)
+	// TODO: config
+	host := os.Getenv("SERVER_HOST")
+	if host == "" {
+		host = "http://localhost:8000"
+	}
+	srv.SetHost(host)
 
-	// TODO: flag to enable TLS?
-	httpSrv := &http.Server{
-		Handler: handler,
-		Addr:    fmt.Sprintf(":%s", port),
-		WriteTimeout: 15 * time.Second,
-		ReadTimeout:  15 * time.Second,
+	var useSSL bool
+	httpsEnabled := os.Getenv("HTTPS_ENABLED")
+	if httpsEnabled == "1" || strings.ToLower(httpsEnabled) == "true" {
+		useSSL = true
 	}
 
-	// TODO: config
-	srv.SetHost("http://localhost:8000")
+	var handler http.Handler
+	handler = c.Handler(srv)
 
-	log.Println("Serving...")
-	log.Println(httpSrv.ListenAndServe())
+	if useSSL {
+		dataDir := "/data/ssl_cache"
+		hostPolicy := func(ctx context.Context, host string) error {
+			allowedHost := "api.cbbpoll.com"
+			if host == allowedHost {
+				return nil
+			}
+			return fmt.Errorf("acme/autocert: only %s host is allowed", allowedHost)
+		}
+
+		m := &autocert.Manager{
+			Prompt:     autocert.AcceptTOS,
+			HostPolicy: hostPolicy,
+			Cache:      autocert.DirCache(dataDir),
+		}
+		httpsSrv := makeHTTPServer(handler, "443")
+		httpsSrv.TLSConfig = &tls.Config{GetCertificate: m.GetCertificate}
+
+		d1 := serverListen(httpsSrv, true)
+
+		httpSrv := makeHTTPServer(m.HTTPHandler(nil), "80")
+		d2 := serverListen(httpSrv, false)
+		<-d1
+		<-d2
+		log.Println("Done")
+
+	} else {
+		httpSrv := makeHTTPServer(handler, port)
+		done := serverListen(httpSrv, false)
+		<-done
+		log.Println("Done")
+	}
+
+	os.Exit(0)
+}
+
+func serverListen(s *http.Server, tls bool) chan bool {
+	done := make(chan bool, 1)
+	signalled := make(chan os.Signal, 1)
+	signal.Notify(signalled, os.Interrupt, syscall.SIGINT, syscall.SIGTERM, syscall.SIGSTOP)
+	go func() {
+		if tls {
+			log.Println(s.ListenAndServeTLS("", ""))
+		} else {
+			log.Println(s.ListenAndServe())
+		}
+	}()
+	log.Printf("Serving %s", s.Addr)
+	go func() {
+		<-signalled
+		log.Println("Server stopping")
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+		defer cancel()
+		_ = s.Shutdown(ctx)
+		log.Println("Server stopped")
+		close(done)
+	}()
+
+	return done
+}
+
+func makeHTTPServer(handler http.Handler, port string) *http.Server {
+	return &http.Server{
+		Handler:      handler,
+		Addr:         fmt.Sprintf(":%s", port),
+		WriteTimeout: 15 * time.Second,
+		ReadTimeout:  15 * time.Second,
+		IdleTimeout:  120 * time.Second,
+	}
 }
 
 func setupAuth(server *server.Server) {
-	keyFile, err := os.Open("jwtRS256.key")
+	keyFile, err := os.Open("/data/jwtRS256.key")
 	if err != nil {
 		log.Fatalf("error opening secret key file: %s", err.Error())
 	}
@@ -89,7 +164,7 @@ func setupAuth(server *server.Server) {
 		}
 	}()
 
-	pubKeyFile, err := os.Open("jwtRS256.key.pub")
+	pubKeyFile, err := os.Open("/data/jwtRS256.key.pub")
 	if err != nil {
 		log.Fatalf("error opening public key file: %s", err.Error())
 	}
